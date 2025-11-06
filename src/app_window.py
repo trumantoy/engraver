@@ -94,7 +94,7 @@ class AppWindow (Gtk.ApplicationWindow):
         # self.camera_controller.add_camera(self.editor.ortho_camera)
         for c in self.tool.get_viewport(): self.camera_controller.add_camera(c)
 
-        self.panel.add(self.tool)
+        # self.panel.add(self.tool)
         self.hotbar.set_items(self.tool.get_hot_items())
         self.hotbar.connect('item_added',lambda sender,obj: self.panel.add(obj,self.tool))
 

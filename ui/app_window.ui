@@ -34,6 +34,9 @@
         <child type="start">
           <object class="GtkBox">          
             <property name="spacing">0</property>
+                <style>
+                    <class name="linked"/>
+                </style>
             <child>
               <object class="GtkButton">
                 <property name="label">撤销</property>
@@ -44,9 +47,6 @@
               <object class="GtkButton">
                 <property name="label">恢复</property>
                 <property name="icon-name">go-next-symbolic</property>            
-                <style>
-                    <class name="linked"/>
-                </style>
               </object>
             </child>
           </object>

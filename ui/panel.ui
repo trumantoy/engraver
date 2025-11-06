@@ -24,41 +24,636 @@
     </menu>
 
 
-    <template class="Panel" parent="GtkPaned">
-        <!-- 设置为水平分隔，若要垂直分隔，将值改为 vertical -->
+    <template class="Panel" parent="GtkBox">
         <property name="orientation">vertical</property>
-        <property name="position">300</property>
-        <!-- <property name="wide-handle">True</property> -->
-        <property name="margin-start">5</property>
-        <property name="margin-end">5</property>
+   
 
         <child>
             <object class="GtkBox">
-                <property name="orientation">vertical</property>
+                <property name="height-request">90</property>
+                <property name="margin-start">10</property>
+                <property name="margin-end">10</property>
+                <property name="spacing">10</property>
+
                 <child>
-                    <object class="GtkLabel">
-                        <property name="label">&lt;b&gt;场景&lt;/b&gt;</property>
-                        <property name="use-markup">True</property>
-                        <property name="margin-top">10</property>
-                        <property name="margin-bottom">10</property>
+                    <object class="GtkImage">
+                        <property name="icon-name">printer-symbolic</property>
+                        <!-- <property name="file">res/测试设备.png</property> -->
+                        <property name="pixel-size">60</property>
                     </object>
                 </child>
+                
                 <child>
-                    <object class="GtkSeparator">
-                        <property name="orientation">horizontal</property>
-                    </object>
-                </child>
-                <child>
-                    <object class="GtkScrolledWindow">
+                    <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <property name="margin-top">30</property>
+                        <property name="margin-bottom">30</property>
+                        <property name="spacing">5</property>
+                        <property name="hexpand">True</property>
+                        <property name="halign">start</property>
+
                         <child>
-                            <object class="GtkListView" id="geoms">
-                                <property name="vexpand">True</property>
+                            <object class="GtkLabel">
+                                <property name="label">&lt;b&gt;M3-00-355&lt;/b&gt;</property>
+                                <property name="use-markup">True</property>
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkBox">
+                                <property name="spacing">5</property>
+                                <child>
+                                    <object class="GtkImage">
+                                        <style><class name="green-dot"></class></style>
+                                    </object>
+                                </child>
+
+                                <child>
+                                    <object class="GtkLabel">
+                                        <property name="label">&lt;small&gt;已连接&lt;/small&gt;</property>
+                                        <property name="use-markup">True</property>
+                                    </object>
+                                </child>
+
                             </object>
                         </child>
                     </object>
                 </child>
+
+                <child>
+                    <object class="GtkBox">
+                        <property name="margin-top">35</property>
+                        <property name="margin-bottom">35</property>
+                        <property name="spacing">5</property>
+
+                        <child>
+                            <object class="GtkButton">
+                                <property name="icon-name">network-transmit-receive-symbolic</property>
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkButton">
+                                <property name="icon-name">emblem-system-symbolic</property>
+                            </object>
+                        </child>
+                    </object>
+                </child>
+
             </object>
         </child>
+        <child>
+            <object class="GtkSeparator">
+                <property name="orientation">horizontal</property>
+            </object>
+        </child>
+        <child>
+            <object class="GtkScrolledWindow">
+                <child>
+                    <object class="GtkBox">
+                        <property name="orientation">vertical</property>
+                        <child>
+
+                            <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="visible">False</property>
+                                <child>
+                                    <object class="GtkLabel">
+                                        <property name="label">参数总览</property>
+                                        <property name="halign">start</property>
+                                        <property name="margin-top">10</property>
+                                        <property name="margin-bottom">10</property>
+                                        <property name="margin-start">10</property>
+                                        <property name="margin-end">10</property>
+                                    </object>
+                                </child>
+                                <child>
+                                    <object class="GtkListBox">
+                                        <property name="vexpand">True</property>
+                                        <property name="margin-start">10</property>
+                                        <property name="margin-end">10</property>
+                                        <property name="selection-mode">GTK_SELECTION_NONE</property>
+                                        <signal name="row-activated" handler="on_activate_cursor_row" swapped="no"/>
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="height-request">80</property>
+                                                <property name="spacing">5</property>
+                                                <child>
+                                                    <object class="GtkImage">
+                                                        <property name="pixel-size">80</property>
+                                                        <property name="icon-name">format-text-bold-symbolic</property>
+                                                    </object>
+                                                </child>
+
+                                                <child>
+                                                    <object class="GtkBox">
+                                                        <property name="orientation">vertical</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="hexpand">True</property>
+                                                        <property name="spacing">1</property>
+                                                        <child>
+                                                            <object class="GtkLabel">
+                                                                <property name="halign">start</property>
+                                                                <property name="label">&lt;span size="large"&gt;线条雕刻&lt;/span&gt;</property>
+                                                                <property name="use-markup">True</property>
+
+                                                            </object>
+                                                        </child>
+                                                        <child>
+                                                            <object class="GtkLabel">
+                                                                <property name="label">&lt;span size="medium"&gt;蓝光&lt;/span&gt;</property>
+                                                                <property name="use-markup">True</property>
+                                                                <property name="halign">start</property>
+                                                            </object>
+                                                        </child>
+                                                        <child>
+                                                            <object class="GtkBox">
+                                                                <property name="spacing">20</property>
+
+                                                                <child>
+                                                                    <object class="GtkLabel">
+                                                                        <property name="label">&lt;span color="gray" size="medium"&gt;9%&lt;/span&gt;</property>
+                                                                        <property name="use-markup">True</property>
+                                                                        <property name="halign">start</property>
+                                                                    </object>
+                                                                </child>
+
+                                                                <child>
+                                                                    <object class="GtkLabel">
+                                                                        <property name="label">&lt;span color="gray" size="medium"&gt;20mm/s&lt;/span&gt;</property>
+                                                                        <property name="use-markup">True</property>
+                                                                        <property name="halign">start</property>
+                                                                        <property name="halign">end</property>
+                                                                    </object>
+                                                                </child>
+
+                                                            </object>
+                                                        </child>
+                                                    </object>
+                                                </child>
+
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">10</property>
+                                <property name="margin-start">10</property>
+                                <property name="margin-end">10</property>
+                                <property name="margin-top">10</property>
+                                <property name="margin-bottom">10</property>
+                                <property name="vexpand">True</property>
+                                <child>
+                                    <object class="GtkBox">
+                                        <property name="spacing">10</property>
+                                        <child>
+                                            <object class="GtkButton">
+                                                <property name="icon-name">go-previous-symbolic</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">参数总览</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <property name="margin-top">10</property>
+                                        <property name="margin-bottom">10</property>
+                                        <property name="margin-start">10</property>
+                                        <property name="margin-end">10</property>
+                                        <property name="spacing">10</property>
+                                        <child>
+                                            <object class="GtkImage">
+                                                <property name="pixel-size">40</property>
+                                                <property name="icon-name">format-text-bold-symbolic</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">vertical</property>
+                                                <property name="valign">center</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="spacing">5</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="halign">start</property>
+                                                        <property name="label">&lt;span size="large"&gt;文本&lt;/span&gt;</property>
+                                                        <property name="use-markup">True</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="spacing">5</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">执行</property>
+                                                        <property name="use-markup">True</property>                <property name="use-markup">True</property>
+                                                    </object>
+                                                </child>
+
+                                                <child> 
+                                                    <object class="GtkSwitch">
+                                                        <property name="margin-top">10</property>
+                                                        <property name="margin-bottom">10</property>  
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                    
+                                    </object>
+
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <style><class name="linked"/></style>
+                                        <property name="spacing">0</property>
+                                        <property name="halign">center</property>
+                                        <child>
+                                            <object class="GtkToggleButton" id="a">
+                                                <property name="label">线条雕刻</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkToggleButton" id="b">         
+                                                <property name="label">填充雕刻</property>
+                                                <property name="group">a</property>
+                                            </object>
+                                        </child>
+                                        <child>
+                                            <object class="GtkToggleButton" id="c">         
+                                                <property name="label">线条切割</property>
+                                                <property name="group">a</property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">激光光源</property>                         
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkDropDown">
+                                                <property name="hexpand">True</property>
+                                                <property name="model">
+                                                    <object class="GtkStringList">
+                                                        <items>
+                                                            <item>蓝光</item>
+                                                            <item>光纤红外光</item>
+                                                        </items>
+                                                    </object>
+                                                </property>
+                                            </object>
+                                        </child>
+                                    </object>
+
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">功率(%)</property>           
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkSpinButton">
+                                                <property name="digits">0</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="adjustment">
+                                                    <object class="GtkAdjustment">
+                                                        <property name="lower">1</property>
+                                                        <property name="upper">100</property>
+                                                        <property name="step_increment">1</property>
+                                                        <property name="page_increment">10</property>
+                                                        <property name="page_size">0</property>
+                                                        <property name="value">1</property>
+                                                    </object>
+                                                </property>
+                                                <property name="climb_rate">1</property>
+                                                <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                            </object>
+                                        </child>
+                                    </object>
+
+                                </child>
+
+                                
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">速度(mm/s)</property>           
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkSpinButton">
+                                                <property name="digits">0</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="adjustment">
+                                                    <object class="GtkAdjustment">
+                                                        <property name="lower">1</property>
+                                                        <property name="upper">100</property>
+                                                        <property name="step_increment">1</property>
+                                                        <property name="page_increment">10</property>
+                                                        <property name="page_size">0</property>
+                                                        <property name="value">1</property>
+                                                    </object>
+                                                </property>
+                                                <property name="climb_rate">1</property>
+                                                <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                            </object>
+                                        </child>
+                                    </object>
+
+                                </child>
+
+                                
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">加工次数</property>           
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkSpinButton">
+                                                <property name="digits">0</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="adjustment">
+                                                    <object class="GtkAdjustment">
+                                                        <property name="lower">1</property>
+                                                        <property name="upper">10</property>
+                                                        <property name="step_increment">1</property>
+                                                        <property name="page_increment">10</property>
+                                                        <property name="page_size">0</property>
+                                                        <property name="value">1</property>
+                                                    </object>
+                                                </property>
+                                                <property name="climb_rate">1</property>
+                                                <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                            </object>
+                                        </child>
+                                    </object>
+
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">vertical</property>
+                                                <property name="halign">start</property>
+                                                <property name="valign">center</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">割缝补偿(mm)</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="hexpand">True</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkBox">
+                                                <child>
+                                                    <object class="GtkSwitch">
+                                                        <property name="margin-top">5</property>
+                                                        <property name="margin-bottom">5</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">雕刻密度</property>           
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkSpinButton">
+                                                <property name="digits">0</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="adjustment">
+                                                    <object class="GtkAdjustment">
+                                                        <property name="lower">1</property>
+                                                        <property name="upper">300</property>
+                                                        <property name="step_increment">1</property>
+                                                        <property name="page_increment">10</property>
+                                                        <property name="page_size">0</property>
+                                                        <property name="value">100</property>
+                                                    </object>
+                                                </property>
+                                                <property name="climb_rate">1</property>
+                                                <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                            </object>
+                                        </child>
+                                    </object>
+
+                                </child>
+
+                                
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">扫描模式</property>                         
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkDropDown">
+                                                <property name="hexpand">True</property>
+                                                <property name="model">
+                                                    <object class="GtkStringList">
+                                                        <items>
+                                                            <item>双向扫描</item>
+                                                            <item>单向扫描</item>
+                                                        </items>
+                                                    </object>
+                                                </property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="orientation">vertical</property>
+                                                <property name="halign">start</property>
+                                                <property name="valign">center</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">断点打印</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="hexpand">True</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkBox">
+                                                <child>
+                                                    <object class="GtkSwitch">
+                                                        <property name="margin-top">5</property>
+                                                        <property name="margin-bottom">5</property>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+                                
+                                <child>
+                                    <object class="GtkBox">
+                                        <child>
+                                            <object class="GtkLabel">
+                                                <property name="label">图像模式</property>                         
+                                                <property name="use-markup">True</property>
+                                                <property name="xalign">0.0</property>
+                                                <property name="width-request">170</property>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkDropDown">
+                                                <property name="hexpand">True</property>
+                                                <property name="model">
+                                                    <object class="GtkStringList">
+                                                        <items>
+                                                            <item>灰度</item>
+                                                        </items>
+                                                    </object>
+                                                </property>
+                                            </object>
+                                        </child>
+                                    </object>
+                                </child>
+
+
+
+                            </object>
+                        </child>
+                    </object>
+
+                </child>
+            </object>
+        </child>
+        
+        <child>
+            <object class="GtkSeparator">
+                <property name="orientation">horizontal</property>
+            </object>
+        </child>
+
+         <child>
+            <object class="GtkBox">
+                <property name="orientation">vertical</property>
+                <property name="margin-top">20</property>
+                <property name="margin-bottom">20</property>
+                <property name="margin-start">20</property>
+                <property name="margin-end">20</property>
+                <property name="spacing">15</property>
+
+                <child>
+                    <object class="GtkBox">
+                        <property name="height-request">40</property>
+                        <style><class name="linked"/></style>
+                        <child>
+                            <object class="GtkButton">
+                                <property name="label">走边框</property>
+                                <property name="hexpand">True</property>
+                                <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkButton">
+                                <property name="label">···</property>
+                                <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
+                            </object>
+                        </child>
+
+                    </object>
+                </child>
+                
+
+                <child>
+                    <object class="GtkBox">
+                        <property name="height-request">40</property>
+                        <style><class name="linked"/></style>
+                        <child>
+                            <object class="GtkButton">
+                                <style><class name="green-btn"></class></style>
+                                <property name="label">加工</property>
+                                <property name="hexpand">True</property>
+                                <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
+                            </object>
+                        </child>
+
+                        <child>
+                            <object class="GtkButton">
+                                <style><class name="green-btn"></class></style>
+                                <property name="label">···</property>
+                                <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
+                            </object>
+                        </child>
+
+                    </object>
+                </child>
+            </object>
+        </child>
+
+
+<!--         
         <child>
             <object class="GtkBox">
                 <property name="orientation">vertical</property>
@@ -92,7 +687,7 @@
                                                             <object class="GtkLabel">
                                                                 <property name="label">端口</property>                           <property name="use-markup">True</property>
                                                                 <property name="xalign">0.0</property>
-                                                                <property name="width-request">100</property>
+                                                                <property name="width-request">170</property>
                                                             </object>
                                                         </child>
 
@@ -160,7 +755,7 @@
                                                                 <property name="label">点大小</property>
                                                                 <property name="use-markup">True</property>
                                                                 <property name="xalign">0.0</property>
-                                                                <property name="width-request">100</property>
+                                                                <property name="width-request">170</property>
                                                             </object>
                                                         </child>
                                                         <child>
@@ -273,6 +868,6 @@
             </object>
         </child>
 
-        
+         -->
     </template>
 </interface>

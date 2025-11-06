@@ -1,0 +1,16 @@
+.green-dot {
+  background-color: #4CAF50; /* 绿色背景 */
+  border-radius: 100%; 
+}
+
+.green-btn {
+  background: green; /* 绿色背景 */
+}
+
+.green-btn:hover {
+    background-color: #4CAF50; /* 深绿色背景 */
+}
+
+.green-btn:active {
+  background-color: green;
+}

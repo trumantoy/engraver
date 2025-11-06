@@ -116,7 +116,7 @@ class Viewbar (Gtk.ScrolledWindow):
     def on_back_clicked(self,button):
         perspective,orthographic = self.view_controller.cameras
         perspective : gfx.PerspectiveCamera
-        orthographic : gfx.OrthographicCamera        
+        orthographic : gfx.OrthographicCamera
         extent = perspective.height
         factor = 0.5 / m.tan(0.5 * m.radians(perspective.fov))
         distance = extent * factor
@@ -159,7 +159,6 @@ class Hotbar (Gtk.ScrolledWindow):
         for text,action,icon in items:
             def callback(sender,f):
                 self.emit('item_added', f())
-
             button = Gtk.Button()
             button.connect('clicked',callback, action)
             button.set_label(text)

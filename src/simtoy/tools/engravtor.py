@@ -608,16 +608,21 @@ class Label(TranformHelper):
 
         obj = gfx.Text(material=gfx.TextMaterial(pick_write=True),
                         text=text,font_size=font_size,family=family,render_order=1000)
+        
         self.add(obj)
 
 
 class Bitmap(TranformHelper):
     def __init__(self):
         super().__init__()
-        im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32)
-        tex = gfx.Texture(im*255,dim=2)
-        obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=gfx.TextureMap(tex,filter='nearest')))
+        self.im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
+        tex = gfx.Texture(self.im,dim=2)
+        tex_map = gfx.TextureMap(tex,filter='nearest')
+        obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map)) 
         self.add(obj)
+
+    def get_image(self):
+        return self.im.astype(np.uint8)
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -668,7 +673,7 @@ class Engravtor(gfx.WorldObject):
     def init_params(self):
         self.y_lim = self.x_lim = (0,0.100)
         self.light_spot_size = 0.0000075
-        self.pixelsize = 1
+        self.pixelsize = 0.1
         self.paths = list()
 
     def get_view_focus(self):
@@ -705,7 +710,7 @@ class Engravtor(gfx.WorldObject):
             aabb = self.target.get_geometry_bounding_box()
             target_height = (aabb[1][2] - aabb[0][2])
             
-            element = Label('中国制造',0.01,'KaiTi',name='文本')
+            element = Label('中',0.01,'KaiTi',name='文本')
             element.local.z = target_height + 0.00001
             element._camera = self.persp_camera
             element.set_tranform_visible(False)
@@ -731,38 +736,53 @@ class Engravtor(gfx.WorldObject):
 
     def export_svg(self,file_name):
         import cairo
-        width = (self.x_lim[1] - self.x_lim[0]) * 1000
-        height = (self.y_lim[1] - self.y_lim[0]) * 1000
+        width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
+        height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
 
         with cairo.SVGSurface(file_name, width, height) as surface:
             cr = cairo.Context(surface)
-            cr.translate(width / 2, height / 2)
-
+            cr.save()
+            cr.translate(width / 2,height / 2)
             for obj in self.target_area.children:
                 if type(obj) == Label:
                     obj : Label
                     cr.set_source_rgb(1, 0, 0)
-                    cr.set_line_width(self.light_spot_size * 100000)
+                    cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize)
                     cr.set_font_size(obj.font_size * 1000)
                     cr.select_font_face(obj.family)
                     ascent, descent, font_height, max_x_advance, max_y_advance = cr.font_extents()
                     text_extents = cr.text_extents(obj.text)
                     xoffset = 0.
                     yoffset = 0.
-                    cr.move_to(obj.local.x * 1000 - text_extents.width / 2 + xoffset, 
-                                -(obj.local.y * 1000 + descent - text_extents.height / 2 + yoffset) )
+                    cr.move_to(obj.local.x * 1000,  
+                                -(obj.local.y * 1000))
+
                     cr.text_path(obj.text)
                     cr.stroke()
                     
-                    cr.rectangle(obj.local.x * 1000 - text_extents.width / 2 + xoffset, 
-                                -(obj.local.y * 1000 + text_extents.height / 2 + yoffset),
-                                text_extents.width,text_extents.height)
-                    cr.stroke()
-
                 elif type(obj) == Bitmap:
-                    pass
+                    obj : Bitmap
+                    aabb = obj.get_bounding_box()
+                    width = int((aabb[1][0] - aabb[0][0]) * 1000 / self.pixelsize)
+                    height = int((aabb[1][1] - aabb[0][1]) * 1000 / self.pixelsize)
+
+                    import PIL.Image
+                    image = PIL.Image.fromarray(obj.get_image())
+                    image = image.resize((width,height),resample=PIL.Image.Resampling.NEAREST)
+                    image = image.convert('RGBA')
+                    rgba_array = np.array(image)
+                    
+                    image_surface = cairo.ImageSurface.create_for_data(rgba_array.data,cairo.Format.ARGB32,width,height)
+
+                    cr.scale(self.pixelsize,self.pixelsize)
+                    cr.set_source_surface(image_surface, 
+                        obj.local.x * 1000 / self.pixelsize - image_surface.get_width() / 2, 
+                        -(obj.local.y * 1000 / self.pixelsize + image_surface.get_height() / 2))
+                
+                    cr.paint()
                 else:
                     pass
+            cr.restore()
 
         return width,height
     
@@ -787,8 +807,8 @@ class Engravtor(gfx.WorldObject):
             elif cmd == 'M5':
                 self.line = None
                 self.cutting = False
-    
-                if self.laser:
+
+                if hasattr(self,'laser') and self.laser:
                     self.target_area.remove(self.laser)
                     self.laser = None
             elif cmd.startswith('X'):
