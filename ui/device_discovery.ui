@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+
+  <template class="DeviceDiscoveryDialog" parent="GtkWindow">
+    <property name="width-request">800</property>
+    <property name="height-request">600</property>
+    
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header">
+        <property name="show-title-buttons">yes</property>
+
+        <child type="title">
+          <object class="GtkLabel">
+            <property name="label">设备发现</property>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+    <child>
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="margin-top">40</property>
+        <property name="margin-bottom">40</property>
+        <property name="margin-start">40</property>
+        <property name="margin-end">40</property>
+        
+        <property name="spacing">10</property>
+        
+        <child>
+          <object class="GtkStackSwitcher">
+            <property name="stack">stack</property>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkStack" id="stack">
+            <child>
+              <object class="GtkStackPage">
+                <property name="name">USB</property>
+                <property name="title">USB</property>
+                <property name="child">
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">10</property>
+                    <child>
+                      <object class="GtkLabel">
+                        <property name="label">请使用USB线与设备相连</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkListView" id="usb_list">
+                        <property name="vexpand">True</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <child>
+                          <object class="GtkButton" id="usb_refresh">
+                            <property name="label">刷新</property>
+                            <property name="halign">start</property>
+                            <signal name="clicked" handler="btn_usb_refresh_clicked" swapped="no"/>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="usb_add">
+                            <property name="label">添加</property>
+                            <property name="halign">end</property>
+                            <signal name="clicked" handler="btn_usb_add_clicked" swapped="no"/>
+                          </object>
+                        </child>
+
+                      </object>
+                    </child>
+                  </object>
+                </property>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkStackPage">
+                <property name="name">WIFI</property>
+                <property name="title">WIFI</property>
+                <property name="child">
+                  <object class="GtkLabel">
+                    <property name="label"></property>
+                  </object>
+                </property>
+              </object>
+            </child>
+
+            <child>
+              <object class="GtkStackPage">
+                <property name="name">IP</property>
+                <property name="title">IP</property>
+                <property name="child">
+                  <object class="GtkLabel">
+                    <property name="label"></property>
+                  </object>
+                </property>
+              </object>
+            </child>
+
+          </object>
+        </child>
+
+      </object>
+    </child>
+    
+    
+
+  </template>
+</interface>

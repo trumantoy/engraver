@@ -1,5 +1,6 @@
 import gi
 
+
 from simtoy.tools import engravtor
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk, GObject, Gio, Gdk
@@ -11,6 +12,8 @@ from simtoy import *
 class Panel (Gtk.Box):
     __gtype_name__ = "Panel"
     provider = Gtk.CssProvider.new()
+    btn_device_manager = Gtk.Template.Child('device_manager')
+    btn_device_discovery = Gtk.Template.Child('device_discovery')
 
     # listview = Gtk.Template.Child('geoms')
     # expander_device = Gtk.Template.Child('expander_device')
@@ -29,6 +32,9 @@ class Panel (Gtk.Box):
         self.provider.load_from_path('ui/panel.css')
         Gtk.StyleContext.add_provider_for_display(self.get_display(),self.provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
+
+        
+        
         # self.model = Gio.ListStore(item_type=GObject.Object)
         # self.tree_model = Gtk.TreeListModel.new(self.model,passthrough=False,autoexpand=False,create_func=lambda item: item.model)
 
@@ -56,6 +62,29 @@ class Panel (Gtk.Box):
         # right_click_gesture.set_button(3)  # 3 代表鼠标右键
         # right_click_gesture.connect("pressed", self.listview_right_clicked)
         # self.listview.add_controller(right_click_gesture)
+
+    @Gtk.Template.Callback()
+    def device_manager_clicked(self, btn):
+        print('device manager clicked')
+        from device_manager import DeviceManagerDialog
+        dlg = DeviceManagerDialog()
+        dlg.set_modal(True)
+        dlg.set_transient_for(self.get_root())
+        dlg.present()
+    
+    @Gtk.Template.Callback()
+    def device_discovery_clicked(self, btn):
+        from device_discovery import DeviceDiscoveryDialog
+        dlg = DeviceDiscoveryDialog()
+        dlg.set_modal(True)
+        dlg.set_transient_for(self.get_root())
+        dlg.connect('close-request', self.device_discovery_closed)
+        dlg.present()
+
+    def device_discovery_closed(self, dlg):
+        if dlg.result:
+            print(dlg.result)
+
 
     @Gtk.Template.Callback()
     def on_activate_cursor_row(self,listbox, row):

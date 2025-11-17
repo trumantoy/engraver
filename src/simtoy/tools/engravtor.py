@@ -1,5 +1,6 @@
 from trimesh.creation import cylinder
 from trimesh.visual import texture
+import cairo
 import wgpu
 import pygfx as gfx
 from pygfx.renderers.wgpu import *
@@ -365,8 +366,8 @@ class AxisShader(BaseShader):
         """
 
 class TranformHelper(gfx.WorldObject):
-    def __init__(self, geometry=None, material=None, *args, **kwargs):
-        super().__init__(geometry, material, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self._ref = None
         self._object_to_control = self 
@@ -374,16 +375,8 @@ class TranformHelper(gfx.WorldObject):
         self._ndc_to_screen = None
 
         self._create_elements()
-        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
+        # self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
     
-    def set_tranform_visible(self,visible):
-        self.axis_x.visible = visible
-        self.axis_y.visible = visible
-        self.arrow_x.visible = visible
-        self.arrow_y.visible = visible
-        self.origin.visible = visible
-        self.plane_xy.visible = visible
-
     def _create_elements(self):
         axis_length = 0.01
         axis_size = 0.0002
@@ -441,8 +434,8 @@ class TranformHelper(gfx.WorldObject):
         self._screen_to_ndc = screen_space.matrix
 
     def _process_event(self, event):
-        self._update_ndc_screen_transform()
-        self._update_directions()
+        # self._update_ndc_screen_transform()
+        # self._update_directions()
 
         type = event.type
 
@@ -460,8 +453,6 @@ class TranformHelper(gfx.WorldObject):
             # Depending on the object under the pointer, we scale/translate/rotate
             if ob in self._translate_children:
                 self._handle_start("translate", event, ob)
-            else:
-                self.set_tranform_visible(True)
             # elif ob in self._scale_children:
             #     self._handle_start("scale", event, ob)
             # elif ob in self._rotate_children:
@@ -605,12 +596,49 @@ class Label(TranformHelper):
         self.text = text
         self.font_size = font_size
         self.family = family
-
-        obj = gfx.Text(material=gfx.TextMaterial(pick_write=True),
-                        text=text,font_size=font_size,family=family,render_order=1000)
         
-        self.add(obj)
+        temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)  # 临时1x1像素表面
+        temp_ctx = cairo.Context(temp_surface)
+        
+        # 配置与最终绘制一致的字体
+        temp_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        temp_ctx.set_font_size(font_size)
+        
+        # 获取文字的详细边界信息（核心参数）
+        text_info = temp_ctx.text_extents(text)
+        text_width = text_info.width          # 文字左边缘到右边缘的实际宽度（无多余）
+        text_height = text_info.height        # 文字上边缘到下边缘的实际高度（含上下伸部分）
+        text_x_bearing = text_info.x_bearing  # 文字左边缘相对于绘制起点的偏移（通常为0，无需修正）
+        text_y_bearing = text_info.y_bearing  # 文字上边缘相对于绘制起点的偏移（负数值，需修正避免顶部裁剪）
 
+        # 2. 图片尺寸=文字实际尺寸（零留白关键）
+        img_width = int(text_width)
+        img_height = int(text_height)
+
+        # 3. 创建最终零留白图片表面
+        final_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
+        final_ctx = cairo.Context(final_surface)
+
+        # 5. 配置字体（与临时上下文一致，确保尺寸匹配）
+        final_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        final_ctx.set_font_size(font_size)
+
+        # 6. 修正文字位置：抵消y_bearing偏移，确保文字顶部贴合图片上边框
+        # x起点：0（文字左边缘=图片左边缘）
+        text_x = -text_x_bearing  # 通常x_bearing=0，即text_x=0
+        # y起点：-text_y_bearing（抵消上边缘偏移，文字顶部=图片上边缘）
+        text_y = -text_y_bearing
+
+        # 7. 绘制文字（黑色，可修改RGB值换颜色）
+        final_ctx.set_source_rgb(1, 1, 1)
+        final_ctx.move_to(text_x, text_y)
+        final_ctx.show_text(text)
+        argb_array = np.frombuffer(final_surface.get_data(), dtype=np.uint8).reshape((img_height, img_width, 4))
+        tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
+        tex_map = gfx.TextureMap(tex,filter='nearest')
+        obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map))
+
+        self.add(obj)
 
 class Bitmap(TranformHelper):
     def __init__(self):
@@ -632,7 +660,7 @@ class Engravtor(gfx.WorldObject):
 
         path = files("simtoy.data.engravtor") / "engravtor.gltf"
         self.scene : gfx.Scene = gfx.load_gltf(path).scene
-        self.scene.traverse(lambda o: setattr(o,'cast_shadow',True) or setattr(o,'receive_shadow',True),True)
+        self.scene.traverse(lambda o: setattr(o,'cast_shadow',True) or  setattr(o,'receive_shadow',True),True)
 
         tool : gfx.WorldObject = self.scene.children[0]
         self.add(tool)
@@ -650,7 +678,7 @@ class Engravtor(gfx.WorldObject):
 
         # ortho_camera : gfx.OrthographicCamera = next(gltf.scene.iter(lambda o: o.name == '正交相机'))
         # ortho_camera.show_pos(target.world.position,up=[0,0,1])
-
+        
         # self.controller = gfx.OrbitController()
         # self.controller.add_camera(persp_camera)
         # self.controller.add_camera(ortho_camera)
@@ -661,6 +689,40 @@ class Engravtor(gfx.WorldObject):
         material = gfx.MeshBasicMaterial(color=(1, 0, 0, 1),flat_shading=True)
         self.focus = gfx.Mesh(geom,material)
         self.target_area.add(self.focus)
+
+        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
+       
+    def _process_event(self, event):
+        print(event.type,event.button)
+        if event.type == "pointer_down" and event.button == 3:
+            screen_xy = np.array([event.x,event.y,0,1])
+
+            x_dim, y_dim = self.persp_camera.logical_size
+            screen_space = AffineTransform()
+            screen_space.position = (-1, 1, 0)
+            screen_space.scale = (2 / x_dim, -2 / y_dim, 1)
+            ndc_to_screen = screen_space.inverse_matrix
+            screen_to_ndc = screen_space.matrix
+
+            ndc_xy = screen_to_ndc @ screen_xy
+
+            v = np.linalg.inv(self.persp_camera.camera_matrix)
+            target = v @ ndc_xy
+            origin = self.persp_camera.world.position
+            
+            direction = target[:3] - origin[:3]
+            direction = direction / np.linalg.norm(direction)
+            print(origin,direction)
+
+
+
+
+
+
+
+
+        
+        
 
     def step(self,dt):
         if self.steps:
@@ -694,13 +756,11 @@ class Engravtor(gfx.WorldObject):
         self.target = target
         self.target_area.add(target)
     
-        target.add_event_handler(lambda e: e.button == 3 and self.unselect_all(self.target_area),'pointer_down')
-
     def unselect_all(self,parent : gfx.WorldObject):
         for obj in parent.children:
             if TranformHelper in type(obj).__mro__:
                 obj : TranformHelper
-                obj.set_tranform_visible(False)
+                obj.set_object(None)
 
     def get_viewport(self):
         return [self.persp_camera]
@@ -710,10 +770,9 @@ class Engravtor(gfx.WorldObject):
             aabb = self.target.get_geometry_bounding_box()
             target_height = (aabb[1][2] - aabb[0][2])
             
-            element = Label('中',0.01,'KaiTi',name='文本')
+            element = Label('中',100 / self.pixelsize,'KaiTi',name='文本')
             element.local.z = target_height + 0.00001
             element._camera = self.persp_camera
-            element.set_tranform_visible(False)
             self.target_area.add(element)
             return element 
 
@@ -724,21 +783,24 @@ class Engravtor(gfx.WorldObject):
             
             element = Bitmap()
             element.local.z = target_height + 0.00001
-            element._camera = self.persp_camera 
-            element.set_tranform_visible(False)
+            element._camera = self.persp_camera
             self.target_area.add(element)
             return element 
 
         return [('文本',label,'format-text-bold'),('位图',bitmap,'image-x-generic-symbolic')]
 
-    def get_actbar(self):
-        return []
+    def select(self,obj):
+        transform_helper = TranformHelper()
+        transform_helper.set_object(obj)
+        self.target_area.add(transform_helper)
+
+        print(obj)
 
     def export_svg(self,file_name):
         import cairo
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
         height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
-
+ 
         with cairo.SVGSurface(file_name, width, height) as surface:
             cr = cairo.Context(surface)
             cr.save()

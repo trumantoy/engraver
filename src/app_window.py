@@ -96,7 +96,7 @@ class AppWindow (Gtk.ApplicationWindow):
 
         # self.panel.add(self.tool)
         self.hotbar.set_items(self.tool.get_hot_items())
-        self.hotbar.connect('item_added',lambda sender,obj: self.panel.add(obj,self.tool))
+        # self.hotbar.connect('item_added',lambda sender,obj: self.panel.add(obj,self.tool))
 
         GLib.timeout_add(1000/180,lambda: self.editor.step() or True)
 
@@ -111,6 +111,7 @@ class AppWindow (Gtk.ApplicationWindow):
 
     def pick(self,x,y):
         info = self.renderer.get_pick_info([x,y])
+        # self.tool.select(info['world_object'])
 
         # GLib.timeout_add(10,lambda: self.camera_controller.remove_camera(camera))
         # if self.panel.selected_item:

@@ -165,3 +165,15 @@ class Hotbar (Gtk.ScrolledWindow):
             button.set_size_request(50,50)
             if icon: button.set_icon_name(icon)
             self.tools.append(button)
+
+
+
+@Gtk.Template(filename='ui/propbar.ui')
+class Propbar (Gtk.ScrolledWindow):
+    __gtype_name__ = "Propbar"
+    tools = Gtk.Template.Child('tools')
+
+    def __init__(self):
+        provider = Gtk.CssProvider.new()
+        provider.load_from_path('ui/propbar.css')
+        Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)

@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
     <template class="Actionbar" parent="GtkScrolledWindow">
-        <style>
-            <class name="actionbar"/>
-        </style>
+        <style><class name="actionbar"/></style>
         <property name="hscrollbar-policy">never</property>
         <property name="vscrollbar-policy">never</property>
         <property name="propagate-natural-width">True</property>
