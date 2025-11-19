@@ -378,6 +378,8 @@ class TranformHelper(gfx.WorldObject):
     
     def set_ref_object(self,obj : gfx.WorldObject):
         aabb = obj.get_bounding_box()
+        sphere = obj.get_bounding_sphere()
+        
         width,height =  aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]
         self.local.position = obj.local.position
 
@@ -388,54 +390,22 @@ class TranformHelper(gfx.WorldObject):
         arrow_length = 0.002
         arrow_size = 0.002
 
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        box = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(color=(1,1,1,0.1)))
-        outline.set_transform_by_object(box,'local')
+        box = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(color=(1,1,1,0.1),depth_test=False))
         self.add(box)
-        self.add(outline)
 
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        lt = gfx.Mesh(gfx.plane_geometry(arrow_size,arrow_size),gfx.MeshBasicMaterial(color='white'))
-        outline.set_transform_by_object(lt,'local')
-        outline.local.position = lt.local.position = (-width/2,height/2,0.0001)
-        self.add(lt)
-        self.add(outline)
+        translation = gfx.Line(gfx.Geometry(positions=[(-width/2,height/2,0),(width/2,height/2,0),(width/2,-height/2,0),(-width/2,-height/2,0),(-width/2,height/2,0)]), gfx.LineMaterial(color='yellow',thickness=2,depth_test=False))
+        self.add(translation)
 
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        rt = gfx.Mesh(gfx.plane_geometry(arrow_size,arrow_size),gfx.MeshBasicMaterial(color='white'))
-        outline.set_transform_by_object(rt,'local')
-        outline.local.position = rt.local.position = (width/2,height/2,0.0001)
-        self.add(rt)
-        self.add(outline)
+        radius = sphere[3]
+        rotation = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='red',depth_test=False))
+        rotation.local.position = (0,radius,0)
+        self.add(rotation)
 
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        lb = gfx.Mesh(gfx.plane_geometry(arrow_size,arrow_size),gfx.MeshBasicMaterial(color='white'))
-        outline.set_transform_by_object(rt,'local')
-        outline.local.position = lb.local.position = (-width/2,-height/2,0.0001)
-        self.add(lb)
-        self.add(outline)
-
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        rb = gfx.Mesh(gfx.plane_geometry(arrow_size,arrow_size),gfx.MeshBasicMaterial(color='white'))        
-        outline.set_transform_by_object(rb,'local')
-        outline.local.position = rb.local.position = (width/2,-height/2,0.0001)
-        self.add(rb)
-        self.add(outline)
-
-        ce = gfx.Mesh(gfx.plane_geometry(arrow_size,arrow_size),gfx.MeshBasicMaterial(color='white'))
-        outline = gfx.BoxHelper(thickness=2, color="green")
-        outline.set_transform_by_object(ce,'local')
-        outline.local.position = ce.local.position = (0,0,0.0001)
-        self.add(ce)
-        self.add(outline)
-
+        scale = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='blue',depth_test=False))
+        scale.local.position = (width/2,-height/2,0)
+        self.add(scale)
 
         
-
-
-        # 原点
-        # self.origin = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), OriginMaterial(pick_write=True))
-        # self.add(self.origin)
 
         # X轴 (红色)
         # geom = gfx.cylinder_geometry(radius_bottom=axis_size,radius_top=axis_size,height=axis_length)
@@ -443,26 +413,6 @@ class TranformHelper(gfx.WorldObject):
         # mat = AxisMaterial(color='red',size=200,pick_write=True)
         # self.axis_x = gfx.WorldObject(geom,mat)
         
-        # # 添加轴端点箭头
-        # geom = gfx.cone_geometry(arrow_size,arrow_length)
-        # self.arrow_x = gfx.Mesh(geom, AxisMaterial(color='red',size=200,pick_write=True))
-        # self.arrow_x.geometry.positions.data[:] = la.vec_transform_quat(geom.positions.data, la.quat_from_euler((0, np.pi/2, 0))) + (axis_length,0,0) 
-        # self.add(self.axis_x)
-        # self.add(self.arrow_x)
-
-        # # Y轴 (绿色)
-        # geom = gfx.cylinder_geometry(radius_bottom=axis_size,radius_top=axis_size,height=axis_length)
-        # geom.positions.data[:] = la.vec_transform_quat(geom.positions.data, la.quat_from_euler((-np.pi/2,0, 0))) + (0,axis_length / 2,0)
-        # mat = AxisMaterial(color='green',size=200,pick_write=True)
-        # self.axis_y = gfx.WorldObject(geom,mat)
-
-        # # 添加轴端点箭头
-        # geom = gfx.cone_geometry(arrow_size,arrow_length)
-        # self.arrow_y = gfx.Mesh(geom, AxisMaterial(color='green',size=200,pick_write=True))
-        # self.arrow_y.geometry.positions.data[:] = la.vec_transform_quat(geom.positions.data, la.quat_from_euler((-np.pi/2,0, 0))) + (0,axis_length,0)
-        # self.add(self.axis_y)
-        # self.add(self.arrow_y)
-
         # plane_geo = gfx.plane_geometry(0.002, 0.002)
         # plane_geo.positions.data[:] = plane_geo.positions.data + (0.001,0.001,0)
         # self.plane_xy = gfx.Mesh(plane_geo,AxisMaterial(color='dodgerblue',size=200,pick_write=True))
@@ -741,9 +691,11 @@ class Engravtor(gfx.WorldObject):
         self.target_area.add(self.focus)
 
         self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
+        self.selected_items = []
        
     def _process_event(self, event):
         print(event.type,event.button)
+        
         if event.type == "pointer_down" and event.button == 3:
             screen_xy = np.array([event.x,event.y,0,1])
 
@@ -758,19 +710,26 @@ class Engravtor(gfx.WorldObject):
 
             v = np.linalg.inv(self.persp_camera.camera_matrix)
             target = v @ ndc_xy
-            origin = self.persp_camera.world.position
+            O = self.persp_camera.world.position
             
-            direction = target[:3] - origin[:3]
-            direction = direction / np.linalg.norm(direction)
+            D = target[:3] - O[:3]
+            D = D / np.linalg.norm(D)
 
             for obj in self.target_area.children:
-                print(obj)
                 if type(obj) != Label:
                     continue
+                
+                # P = O + t * D
+                aabb = obj.get_bounding_box()
 
                 transform_helper = TranformHelper()
                 transform_helper.set_ref_object(obj)
                 self.target_area.add(transform_helper)
+
+                self.selected_items.append(transform_helper)
+
+        for item in self.selected_items:
+            item._process_event(event)
 
     def step(self,dt):
         if self.steps:
