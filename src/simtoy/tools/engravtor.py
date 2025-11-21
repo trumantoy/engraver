@@ -640,6 +640,9 @@ class Label(gfx.WorldObject):
 
         self.add(obj)
 
+    # def get_bounding_box():
+    #     pass
+
 class Bitmap(TranformHelper):
     def __init__(self):
         super().__init__()
@@ -695,32 +698,49 @@ class Engravtor(gfx.WorldObject):
        
     def _process_event(self, event):
         print(event.type,event.button)
+
+        screen_xy = np.array([event.x,event.y,0,1])
+        x_dim, y_dim = self.persp_camera.logical_size
+        screen_space = AffineTransform()
+        screen_space.position = (-1, 1, 0)
+        screen_space.scale = (2 / x_dim, -2 / y_dim, 1)
+        screen_to_ndc = screen_space.matrix
+        ndc_xy = screen_to_ndc @ screen_xy
+        ndc_to_world = la.mat_inverse(self.persp_camera.camera_matrix)
+        # world_xy = la.vec_transform(ndc_xy,ndc_to_world)
+        world_xy = ndc_to_world @ ndc_xy
+        world_xy = world_xy[:-1] / world_xy[-1]
         
         if event.type == "pointer_down" and event.button == 3:
-            screen_xy = np.array([event.x,event.y,0,1])
-
-            x_dim, y_dim = self.persp_camera.logical_size
-            screen_space = AffineTransform()
-            screen_space.position = (-1, 1, 0)
-            screen_space.scale = (2 / x_dim, -2 / y_dim, 1)
-            ndc_to_screen = screen_space.inverse_matrix
-            screen_to_ndc = screen_space.matrix
-
-            ndc_xy = screen_to_ndc @ screen_xy
-
-            v = np.linalg.inv(self.persp_camera.camera_matrix)
-            target = v @ ndc_xy
             O = self.persp_camera.world.position
-            
-            D = target[:3] - O[:3]
+            D = world_xy - O
             D = D / np.linalg.norm(D)
+
+            p = gfx.Points(gfx.Geometry(positions=[(0,0,0)]),gfx.PointsMaterial(color=(1, 0, 0, 1)))
+            self.add(p)
+            p.world.position = world_xy
 
             for obj in self.target_area.children:
                 if type(obj) != Label:
                     continue
                 
-                # P = O + t * D
+                # P = O + t * D 
+                # ( P - v0 ) * n = 0    
+                # n = (v1 - v0) x (v2 - v0)
+                # n = np.cross(v1 - v0,v2 - v0)
+                # n = n / np.linalg.norm(n)
+                
                 aabb = obj.get_bounding_box()
+                print(aabb)
+                v0 = np.array([aabb[0][0],aabb[0][1],0])
+                v1 = np.array([aabb[1][0],aabb[0][1],0])
+                v2 = np.array([aabb[1][0],aabb[1][1],0])
+                v3 = np.array([aabb[0][0],aabb[1][1],0])
+
+                print(v0)
+                print(v1)
+                print(v2)
+                print(v3)
 
                 transform_helper = TranformHelper()
                 transform_helper.set_ref_object(obj)
