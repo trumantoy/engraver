@@ -369,225 +369,107 @@ class TranformHelper(gfx.WorldObject):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._ref = None
-        self._object_to_control = self 
-        self._camera = None
-        self._ndc_to_screen = None
-
-        # self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
-    
     def set_ref_object(self,obj : gfx.WorldObject):
         aabb = obj.get_bounding_box()
-        sphere = obj.get_bounding_sphere()
         
         width,height =  aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]
         self.local.position = obj.local.position
 
-        self._ref = obj
+        self._ref = None
+        self._object_to_control = obj
 
-        axis_length = 0.01
-        axis_size = 0.0002
-        arrow_length = 0.002
-        arrow_size = 0.002
+        self.translation = gfx.Line(gfx.Geometry(positions=[(-width/2,height/2,0),(width/2,height/2,0),(width/2,-height/2,0),(-width/2,-height/2,0),(-width/2,height/2,0)]), gfx.LineMaterial(color='yellow',thickness=2,depth_test=False))
+        self.translation.name = 'translate'
+        self.add(self.translation)
 
-        box = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(color=(1,1,1,0.1),depth_test=False))
-        self.add(box)
+        self.rotataion_size = 0.001
+        self.scale_size = 0.001
 
-        translation = gfx.Line(gfx.Geometry(positions=[(-width/2,height/2,0),(width/2,height/2,0),(width/2,-height/2,0),(-width/2,-height/2,0),(-width/2,height/2,0)]), gfx.LineMaterial(color='yellow',thickness=2,depth_test=False))
-        self.add(translation)
+        self.rotation = gfx.Mesh(gfx.plane_geometry(0.001,0.001), gfx.MeshBasicMaterial(color='green'))
+        self.rotation.local.position = (0,height/2,0)
+        self.rotation.name = 'rotate'
+        box = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='red',depth_test=False))
+        self.rotation.add(box)
+        self.add(self.rotation)
 
-        radius = sphere[3]
-        rotation = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='red',depth_test=False))
-        rotation.local.position = (0,radius,0)
-        self.add(rotation)
+        self.scale = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='blue',depth_test=False))
+        self.scale.local.position = (width/2,-height/2,0)
+        self.scale.name = 'scale'
+        self.add(self.scale)
 
-        scale = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='blue',depth_test=False))
-        scale.local.position = (width/2,-height/2,0)
-        self.add(scale)
-
-        
-
-        # X轴 (红色)
-        # geom = gfx.cylinder_geometry(radius_bottom=axis_size,radius_top=axis_size,height=axis_length)
-        # geom.positions.data[:] = la.vec_transform_quat(geom.positions.data, la.quat_from_euler((0, np.pi/2, 0))) + (axis_length / 2,0,0)
-        # mat = AxisMaterial(color='red',size=200,pick_write=True)
-        # self.axis_x = gfx.WorldObject(geom,mat)
-        
-        # plane_geo = gfx.plane_geometry(0.002, 0.002)
-        # plane_geo.positions.data[:] = plane_geo.positions.data + (0.001,0.001,0)
-        # self.plane_xy = gfx.Mesh(plane_geo,AxisMaterial(color='dodgerblue',size=200,pick_write=True))
-        # self.add(self.plane_xy)
-
-        # self._translate_children = self.axis_x, self.axis_y, self.arrow_x, self.arrow_y, self.plane_xy
-
-        # self.axis_x.dim = self.arrow_x.dim = 0
-        # self.axis_y.dim = self.arrow_y.dim = 1
-        # self.plane_xy.dim = (0,1)
-
-    def _update_ndc_screen_transform(self):
-        # Note: screen origin is at top left corner of NDC with Y-axis pointing down
+    def _update_scale_factor(self,camera):
         x_dim, y_dim = self._camera.logical_size
         screen_space = AffineTransform()
         screen_space.position = (-1, 1, 0)
         screen_space.scale = (2 / x_dim, -2 / y_dim, 1)
-        self._ndc_to_screen = screen_space.inverse_matrix
-        self._screen_to_ndc = screen_space.matrix
+        mvp = screen_space.inverse_matrix @ camera.camera_matrix
 
-    def _process_event(self, event):
-        # self._update_ndc_screen_transform()
-        # self._update_directions()
+        o = np.array([0,0,0])
+        p = np.array([0.001,0,0])
+        o_screen = la.vec_transform(o,mvp)
+        p_screen = la.vec_transform(p,mvp)
 
-        type = event.type
 
-        if type == "pointer_down":
-            if event.button != 3 or event.modifiers:
-                return
+    def _process_event(self, event, P, camera):
+        self._update_scale_factor(camera)
+        
+        if event.button != 3 or event.modifiers:
+            return False
+        
+        if event.type == "pointer_down":            
             self._ref = None
-            # NOTE: I imagine that if multiple tools are active, they
-            # each ask for picking info, causing multiple buffer reads
-            # for the same location. However, with the new event system
-            # this is probably not a problem, when wobjects receive events.
-            ob = event.target
-            if ob not in self.children:
-                return
-            # Depending on the object under the pointer, we scale/translate/rotate
-            if ob in self._translate_children:
-                self._handle_start("translate", event, ob)
-            # elif ob in self._scale_children:
-            #     self._handle_start("scale", event, ob)
-            # elif ob in self._rotate_children:
-            #     self._handle_start("rotate", event, ob)
-            # Highlight the object
-            self.set_pointer_capture(event.pointer_id, event.root)
+                    
+            for obj in [self.translation,self.rotation]:
+                obj : gfx.WorldObject
+                aabb = obj.get_geometry_bounding_box()
 
-        elif type == "pointer_up":
+                lb = np.array([aabb[0][0],aabb[0][1],0])
+                rb = np.array([aabb[1][0],aabb[0][1],0])
+                rt = np.array([aabb[1][0],aabb[1][1],0])
+                lt = np.array([aabb[0][0],aabb[1][1],0])
+                lb = la.vec_transform(lb, obj.world.matrix, projection=False)
+                rb = la.vec_transform(rb, obj.world.matrix, projection=False)
+                rt = la.vec_transform(rt, obj.world.matrix, projection=False)
+                lt = la.vec_transform(lt, obj.world.matrix, projection=False)
+                a = np.cross(rb - lb,P - lb)
+                a = a / np.linalg.norm(a)
+                b = np.cross(rt - rb,P - rb)
+                b = b / np.linalg.norm(b)
+                c = np.cross(lt - rt,P - rt)
+                c = c / np.linalg.norm(c)
+                d = np.cross(lb - lt,P - lt)
+                d = d / np.linalg.norm(d)
+
+                intersection = np.dot(a,b) > 0 and np.dot(b,c) > 0 and np.dot(c,d) > 0 and np.dot(d,a)
+                if intersection:
+                    self._ref = dict(kind=obj.name,start_pos=P)
+                    break
+
             if not self._ref:
-                return
-            if self._ref["dim"] is None and self._ref["maxdist"] < 3:
-                # self.toggle_mode()  # clicked on the center sphere
-                pass
+                return False
+            
+        elif event.type == "pointer_move":
+            if not self._ref:
+                return False
+            
+            if self._ref['kind'] == 'translate':
+                offset = P - self._ref['start_pos']
+                self.world.position = self.world.position + offset
+                self._object_to_control.world.position = self._object_to_control.world.position + offset 
+                self._ref['start_pos'] = P
+            elif self._ref['kind'] == 'rotate':
+                offset = P - self._ref['start_pos']
+                # self.rotation.local.rotation = la.quat_from_euler(la.euler_from_quat(self.rotation.local.rotation) + np.array([0,0,offset[2]]))
+                self._ref['start_pos'] = P
+            elif self._ref['kind'] == 'scale':
+                offset = P - self._ref['start_pos']
+                # self._object_to_control.local.scale = self._object_to_control.local.scale + offset * self.scale_size
+                self._ref['start_pos'] = P
+
+        elif event.type == "pointer_up":
             self._ref = None
-            # De-highlight the object
-            # self._highlight()
-
-        elif type == "pointer_move":
-            if not self._ref:
-                return
-            # Get how far we've moved from starting point - we have a dead zone
-            dist = (
-                (event.x - self._ref["event_pos"][0]) ** 2
-                + (event.y - self._ref["event_pos"][1]) ** 2
-            ) ** 0.5
-            self._ref["maxdist"] = max(self._ref["maxdist"], dist)
-            # Delegate to the correct handler
-            if self._ref["maxdist"] < 3:
-                pass
-            elif self._ref["kind"] == "translate":
-                self._handle_translate_move(event)
-
-    def _handle_start(self, kind, event, ob: WorldObject):
-        this_pos = self._object_to_control.world.position
-        ob_pos = ob.world.position
-        self._ref = {
-            "kind": kind,
-            "event_pos": np.array((event.x, event.y)),
-            "dim": ob.dim,
-            "maxdist": 0,
-            # Transform at time of start
-            "pos": self._object_to_control.world.position,
-            "scale": self._object_to_control.world.scale,
-            "rot": self._object_to_control.world.rotation,
-            "world_pos": ob_pos,
-            "world_offset": ob_pos - this_pos,
-            "ndc_pos": la.vec_transform(ob_pos, self._camera.camera_matrix),
-            # Gizmo direction state at start-time of drag
-            "flips": np.sign(self.world.scale),
-            "world_directions": self._world_directions.copy(),
-            "ndc_directions": self._ndc_directions.copy(),
-            "screen_directions": self._screen_directions.copy(),
-        }
-
-    def _handle_translate_move(self, event):
-        """Translate action, either using a translate1 or translate2 handle."""
-
-        world_to_screen = self._ndc_to_screen @ self._camera.camera_matrix
-        screen_to_world = la.mat_inverse(world_to_screen)
-
-        if isinstance(self._ref["dim"], int):
-            travel_directions = (self._ref["dim"],)
-        else:
-            travel_directions = self._ref["dim"]
-
-        screen_travel = np.array(
-            (
-                event.x - self._ref["event_pos"][0],
-                event.y - self._ref["event_pos"][1],
-            )
-        )
-
-        # units dragged along gizmo axes
-        screen_directions = self._ref["screen_directions"][travel_directions, :]
-        if len(screen_directions) == 1:
-            # translate 1D: only count movement along translation axis
-            units_traveled = get_scale_factor(screen_directions[..., :2], screen_travel)
-        else:
-            # translate 2D: change basis from screen to gizmo axes
-            screen_to_axes = la.mat_inverse(screen_directions[..., :2].T)
-            units_traveled = screen_to_axes @ screen_travel
-
-        # pixel units to world units
-        # Note: location of translation matters because perspective cameras have
-        # shear, i.e., we need to account for start
-        start = la.vec_transform(self._ref["world_pos"], world_to_screen)
-        end = start + screen_directions.T @ units_traveled
-        end_world = la.vec_transform(end, screen_to_world)
-        world_units_traveled = end_world - self._ref["world_pos"]
-
-        self._object_to_control.world.position = self._ref["pos"] + world_units_traveled
-
-    def _update_directions(self):
-        """
-        Calculate how much 1 unit of translation in the draggable space (aka
-        mode) translates the object in world and screen space.
-
-        """
-
-        # work out the transforms between the spaces
-        camera = self._camera
-
-        local_to_world = self._object_to_control.world.matrix
-        local_to_ndc = camera.camera_matrix @ local_to_world
-        local_to_screen = self._ndc_to_screen @ local_to_ndc
-
-        # points referring to local coordinate axes and origin
-        local_points = np.zeros((4, 3))
-        local_points[1:, :] = np.eye(3)
-
-        # express unit vectors and origin in the various frames
-        world_points = la.vec_transform(local_points, local_to_world)
-        ndc_points = la.vec_transform(local_points, local_to_ndc)
-        screen_points = la.vec_transform(local_points, local_to_screen)
-
-        # store the directions for future use
-        self._world_directions = world_points[1:] - world_points[0]
-        self._ndc_directions = ndc_points[1:] - ndc_points[0]
-        self._screen_directions = screen_points[1:] - screen_points[0]
-
-def get_scale_factor(vec1, vec2):
-    """
-    Vector project vec2 onto vec1. Aka, figure out how long vec2
-    is when measured along vec1.
-
-    This is used, for example, to work out how many units the cursor has
-    traveled along a given direction.
-    """
-
-    # Note: implementing it like this saves a couple square-roots from
-    # normalizing
-    return np.sum(vec2 * vec1, axis=-1) / np.sum(vec1**2, axis=-1)
-
-def deg_to_rad(degrees):
-    return degrees / 360 * (2 * np.pi)
+        
+        return True
 
 class Label(gfx.WorldObject):
     def __init__(self,text,font_size,family,*args,**kwargs):
@@ -636,14 +518,13 @@ class Label(gfx.WorldObject):
         argb_array = np.frombuffer(final_surface.get_data(), dtype=np.uint8).reshape((img_height, img_width, 4))
         tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map))
-
+        self.obj = obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map))
         self.add(obj)
 
-    # def get_bounding_box():
-    #     pass
+    def get_geometry_bounding_box(self):
+        return self.obj.get_geometry_bounding_box()
 
-class Bitmap(TranformHelper):
+class Bitmap(gfx.WorldObject):
     def __init__(self):
         super().__init__()
         self.im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
@@ -693,12 +574,10 @@ class Engravtor(gfx.WorldObject):
         self.focus = gfx.Mesh(geom,material)
         self.target_area.add(self.focus)
 
-        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up","wheel")
-        self.selected_items = []
-       
-    def _process_event(self, event):
-        print(event.type,event.button)
-
+        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up")
+        self.transform_helper = None
+        
+    def _process_event(self, event : gfx.Event):
         screen_xy = np.array([event.x,event.y,0,1])
         x_dim, y_dim = self.persp_camera.logical_size
         screen_space = AffineTransform()
@@ -707,49 +586,63 @@ class Engravtor(gfx.WorldObject):
         screen_to_ndc = screen_space.matrix
         ndc_xy = screen_to_ndc @ screen_xy
         ndc_to_world = la.mat_inverse(self.persp_camera.camera_matrix)
-        # world_xy = la.vec_transform(ndc_xy,ndc_to_world)
-        world_xy = ndc_to_world @ ndc_xy
-        world_xy = world_xy[:-1] / world_xy[-1]
+        world_xy = la.vec_transform(ndc_xy[:3],ndc_to_world)[:3]
+        O = self.persp_camera.world.position
+        D = world_xy - O
+        D = D / np.linalg.norm(D)
+        aabb = self.target_area.get_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])
+        N = np.cross(rb - lb,rt - lb)
+        N = N / np.linalg.norm(N)
+        C = self.target_area.world.position
+        t = np.dot(N,O - C) / np.dot(N,-D)
+        P = O + t * D 
+
+        if self.transform_helper:
+            if self.transform_helper._process_event(event,P,self.persp_camera):
+                return
+            
+        selected_items = []
         
         if event.type == "pointer_down" and event.button == 3:
-            O = self.persp_camera.world.position
-            D = world_xy - O
-            D = D / np.linalg.norm(D)
-
-            p = gfx.Points(gfx.Geometry(positions=[(0,0,0)]),gfx.PointsMaterial(color=(1, 0, 0, 1)))
-            self.add(p)
-            p.world.position = world_xy
-
             for obj in self.target_area.children:
-                if type(obj) != Label:
+                if type(obj) != Label and type(obj) != Bitmap:
                     continue
-                
-                # P = O + t * D 
-                # ( P - v0 ) * n = 0    
-                # n = (v1 - v0) x (v2 - v0)
-                # n = np.cross(v1 - v0,v2 - v0)
-                # n = n / np.linalg.norm(n)
-                
-                aabb = obj.get_bounding_box()
-                print(aabb)
-                v0 = np.array([aabb[0][0],aabb[0][1],0])
-                v1 = np.array([aabb[1][0],aabb[0][1],0])
-                v2 = np.array([aabb[1][0],aabb[1][1],0])
-                v3 = np.array([aabb[0][0],aabb[1][1],0])
+                aabb = obj.get_geometry_bounding_box()
+                lb = np.array([aabb[0][0],aabb[0][1],0])
+                rb = np.array([aabb[1][0],aabb[0][1],0])
+                rt = np.array([aabb[1][0],aabb[1][1],0])
+                lt = np.array([aabb[0][0],aabb[1][1],0])    
+                lb = la.vec_transform(lb, obj.world.matrix, projection=False)
+                rb = la.vec_transform(rb, obj.world.matrix, projection=False)
+                rt = la.vec_transform(rt, obj.world.matrix, projection=False)
+                lt = la.vec_transform(lt, obj.world.matrix, projection=False)
 
-                print(v0)
-                print(v1)
-                print(v2)
-                print(v3)
+                a = np.cross(rb - lb,P - lb)
+                a = a / np.linalg.norm(a)
+                b = np.cross(rt - rb,P - rb)
+                b = b / np.linalg.norm(b)
+                c = np.cross(lt - rt,P - rt)
+                c = c / np.linalg.norm(c)
+                d = np.cross(lb - lt,P - lt)
+                d = d / np.linalg.norm(d)
 
-                transform_helper = TranformHelper()
-                transform_helper.set_ref_object(obj)
-                self.target_area.add(transform_helper)
+                intersection = np.dot(a,b) > 0 and np.dot(b,c) > 0 and np.dot(c,d) > 0 and np.dot(d,a)
+                if intersection:
+                    selected_items.append(obj)
+                    break
+            
+            if self.transform_helper:
+                self.target_area.remove(self.transform_helper)
+                self.transform_helper = None
 
-                self.selected_items.append(transform_helper)
-
-        for item in self.selected_items:
-            item._process_event(event)
+            if selected_items:
+                self.transform_helper = TranformHelper()
+                self.transform_helper.set_ref_object(selected_items[0])
+                self.target_area.add(self.transform_helper)
 
     def step(self,dt):
         if self.steps:
