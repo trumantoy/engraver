@@ -374,52 +374,65 @@ class TranformHelper(gfx.WorldObject):
         
         width,height =  aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]
         self.local.position = obj.local.position
+        self.local.rotation = obj.local.rotation
+        self.local.scale = obj.local.scale
 
         self._ref = None
         self._object_to_control = obj
 
-        self.translation = gfx.Line(gfx.Geometry(positions=[(-width/2,height/2,0),(width/2,height/2,0),(width/2,-height/2,0),(-width/2,-height/2,0),(-width/2,height/2,0)]), gfx.LineMaterial(color='yellow',thickness=2,depth_test=False))
+        self.translation = gfx.Line(gfx.Geometry(positions=[(-width/2,height/2,0),(width/2,height/2,0),(width/2,-height/2,0),(-width/2,-height/2,0),(-width/2,height/2,0)]), gfx.LineMaterial(color='green',thickness=2,depth_test=False))
         self.translation.name = 'translate'
         self.add(self.translation)
 
-        self.rotataion_size = 0.001
-        self.scale_size = 0.001
+        self.rotataion_size = 20
+        self.scale_size = 20
 
-        self.rotation = gfx.Mesh(gfx.plane_geometry(0.001,0.001), gfx.MeshBasicMaterial(color='green'))
+        self.rotation = gfx.Mesh(gfx.plane_geometry(1,1), gfx.MeshBasicMaterial(color=(0,0,0,0)))
         self.rotation.local.position = (0,height/2,0)
         self.rotation.name = 'rotate'
-        box = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='red',depth_test=False))
+        box = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMarkerMaterial(size=self.rotataion_size,marker='●',color='red',edge_color='white',depth_test=False))
         self.rotation.add(box)
         self.add(self.rotation)
 
-        self.scale = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMaterial(size=20,color='blue',depth_test=False))
+        self.scale = gfx.Mesh(gfx.plane_geometry(1,1), gfx.MeshBasicMaterial(color=(0,0,0,0)))
         self.scale.local.position = (width/2,-height/2,0)
         self.scale.name = 'scale'
+        box = gfx.Points(gfx.Geometry(positions=[(0,0,0)]), gfx.PointsMarkerMaterial(size=self.scale_size,marker='■',color='blue',edge_color='white',depth_test=False))
+        self.scale.add(box)
         self.add(self.scale)
 
-    def _update_scale_factor(self,camera):
-        x_dim, y_dim = self._camera.logical_size
+    def _update_scale_factor(self,camera : gfx.PerspectiveCamera):
+        x_dim, y_dim = camera.logical_size
         screen_space = AffineTransform()
         screen_space.position = (-1, 1, 0)
         screen_space.scale = (2 / x_dim, -2 / y_dim, 1)
         mvp = screen_space.inverse_matrix @ camera.camera_matrix
-
-        o = np.array([0,0,0])
-        p = np.array([0.001,0,0])
+        mvp_inverse = la.mat_inverse(mvp)
+        
+        o = self.rotation.world.position
         o_screen = la.vec_transform(o,mvp)
-        p_screen = la.vec_transform(p,mvp)
+        o_screen[0] -= self.rotataion_size
+        o2 = la.vec_transform(o_screen,mvp_inverse)
+        size = np.linalg.norm(o - o2)
+        self.rotation.world.scale = size
 
+        o = self.scale.world.position
+        o_screen = la.vec_transform(o,mvp)
+        o_screen[0] -= self.scale_size
+        o2 = la.vec_transform(o_screen,mvp_inverse)
+        size = np.linalg.norm(o - o2)
+        self.scale.world.scale = size
 
-    def _process_event(self, event, P, camera):
+    def _process_event(self, event, world_pos, camera):
         self._update_scale_factor(camera)
+        screen_pos = np.array([event.x,event.y])
         
-        if event.button != 3 or event.modifiers:
-            return False
-        
-        if event.type == "pointer_down":            
+        if event.type == "pointer_down":
             self._ref = None
-                    
-            for obj in [self.translation,self.rotation]:
+            
+            if event.button != 3 or event.modifiers: return False
+
+            for obj in [self.rotation,self.scale,self.translation]:
                 obj : gfx.WorldObject
                 aabb = obj.get_geometry_bounding_box()
 
@@ -431,18 +444,19 @@ class TranformHelper(gfx.WorldObject):
                 rb = la.vec_transform(rb, obj.world.matrix, projection=False)
                 rt = la.vec_transform(rt, obj.world.matrix, projection=False)
                 lt = la.vec_transform(lt, obj.world.matrix, projection=False)
-                a = np.cross(rb - lb,P - lb)
+                
+                a = np.cross(rb - lb,world_pos - lb)
                 a = a / np.linalg.norm(a)
-                b = np.cross(rt - rb,P - rb)
+                b = np.cross(rt - rb,world_pos - rb)
                 b = b / np.linalg.norm(b)
-                c = np.cross(lt - rt,P - rt)
+                c = np.cross(lt - rt,world_pos - rt)
                 c = c / np.linalg.norm(c)
-                d = np.cross(lb - lt,P - lt)
+                d = np.cross(lb - lt,world_pos - lt)
                 d = d / np.linalg.norm(d)
 
-                intersection = np.dot(a,b) > 0 and np.dot(b,c) > 0 and np.dot(c,d) > 0 and np.dot(d,a)
-                if intersection:
-                    self._ref = dict(kind=obj.name,start_pos=P)
+                intersection = np.dot(a,b) >= 0 and np.dot(b,c) >= 0 and np.dot(c,d) >= 0 and np.dot(d,a) >= 0
+                if intersection: 
+                    self._ref = dict(kind=obj.name,world_pos=world_pos,screen_pos=screen_pos)
                     break
 
             if not self._ref:
@@ -453,19 +467,34 @@ class TranformHelper(gfx.WorldObject):
                 return False
             
             if self._ref['kind'] == 'translate':
-                offset = P - self._ref['start_pos']
-                self.world.position = self.world.position + offset
-                self._object_to_control.world.position = self._object_to_control.world.position + offset 
-                self._ref['start_pos'] = P
+                offset = world_pos - self._ref['world_pos']
+                self.local.position = self.local.position + offset
+                self._object_to_control.local.position = self._object_to_control.local.position + offset 
+                self._ref['world_pos'] = world_pos
             elif self._ref['kind'] == 'rotate':
-                offset = P - self._ref['start_pos']
-                # self.rotation.local.rotation = la.quat_from_euler(la.euler_from_quat(self.rotation.local.rotation) + np.array([0,0,offset[2]]))
-                self._ref['start_pos'] = P
+                center = self._object_to_control.world.position
+                dir = world_pos - center
+                dir = dir / np.linalg.norm(dir)
+                dir2 = self.rotation.world.position - center
+                dir2 = dir2 / np.linalg.norm(dir2)
+                dir2[2] = dir[2] = 0
+                offset = min(np.dot(dir,dir2),1.000)
+                offset = np.arccos(offset)
+                aspect = np.cross(dir,dir2)
+                aspect = aspect / np.linalg.norm(aspect)
+                if aspect[2] > 0: offset = -offset
+                self.local.euler_z += offset
+                self._object_to_control.local.euler_z += offset
+                self._ref['screen_pos'] = screen_pos
             elif self._ref['kind'] == 'scale':
-                offset = P - self._ref['start_pos']
-                # self._object_to_control.local.scale = self._object_to_control.local.scale + offset * self.scale_size
-                self._ref['start_pos'] = P
-
+                center = self._object_to_control.world.position
+                dir = self._ref['world_pos'] - center
+                dir2 = world_pos - center
+                scale = np.linalg.norm(dir2) / np.linalg.norm(dir) * self.local.scale
+                offset = world_pos - self._ref['world_pos']
+                self.local.scale = scale
+                self._object_to_control.local.scale = scale
+                self._ref['world_pos'] = world_pos
         elif event.type == "pointer_up":
             self._ref = None
         
@@ -530,11 +559,16 @@ class Bitmap(gfx.WorldObject):
         self.im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
         tex = gfx.Texture(self.im,dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map)) 
-        self.add(obj)
+        self.obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map)) 
+        self.add(self.obj)
 
     def get_image(self):
         return self.im.astype(np.uint8)
+    
+
+    def get_geometry_bounding_box(self):
+        return self.obj.get_geometry_bounding_box()
+
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -574,9 +608,17 @@ class Engravtor(gfx.WorldObject):
         self.focus = gfx.Mesh(geom,material)
         self.target_area.add(self.focus)
 
-        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up")
+        self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
         self.transform_helper = None
-        
+        self.selected_func = None
+        self.transformed_func = None
+
+    def set_selected_func(self,func):
+        self.selected_func = func
+
+    def set_transformed_func(self,func):
+        self.transformed_func = func
+
     def _process_event(self, event : gfx.Event):
         screen_xy = np.array([event.x,event.y,0,1])
         x_dim, y_dim = self.persp_camera.logical_size
@@ -599,10 +641,11 @@ class Engravtor(gfx.WorldObject):
         N = N / np.linalg.norm(N)
         C = self.target_area.world.position
         t = np.dot(N,O - C) / np.dot(N,-D)
-        P = O + t * D 
+        world_pos = O + t * D 
 
         if self.transform_helper:
-            if self.transform_helper._process_event(event,P,self.persp_camera):
+            if self.transform_helper._process_event(event,world_pos,self.persp_camera):
+                if self.transformed_func: self.transformed_func(self.transform_helper._object_to_control)
                 return
             
         selected_items = []
@@ -621,18 +664,19 @@ class Engravtor(gfx.WorldObject):
                 rt = la.vec_transform(rt, obj.world.matrix, projection=False)
                 lt = la.vec_transform(lt, obj.world.matrix, projection=False)
 
-                a = np.cross(rb - lb,P - lb)
+                a = np.cross(rb - lb,world_pos - lb)
                 a = a / np.linalg.norm(a)
-                b = np.cross(rt - rb,P - rb)
+                b = np.cross(rt - rb,world_pos - rb)
                 b = b / np.linalg.norm(b)
-                c = np.cross(lt - rt,P - rt)
+                c = np.cross(lt - rt,world_pos - rt)
                 c = c / np.linalg.norm(c)
-                d = np.cross(lb - lt,P - lt)
+                d = np.cross(lb - lt,world_pos - lt)
                 d = d / np.linalg.norm(d)
 
                 intersection = np.dot(a,b) > 0 and np.dot(b,c) > 0 and np.dot(c,d) > 0 and np.dot(d,a)
                 if intersection:
                     selected_items.append(obj)
+                    if self.selected_func: self.selected_func(obj)
                     break
             
             if self.transform_helper:
@@ -643,7 +687,8 @@ class Engravtor(gfx.WorldObject):
                 self.transform_helper = TranformHelper()
                 self.transform_helper.set_ref_object(selected_items[0])
                 self.target_area.add(self.transform_helper)
-
+                self.transform_helper._process_event(event,world_pos,self.persp_camera)
+                    
     def step(self,dt):
         if self.steps:
             self.steps[0]()
@@ -708,13 +753,6 @@ class Engravtor(gfx.WorldObject):
             return element 
 
         return [('文本',label,'format-text-bold'),('位图',bitmap,'image-x-generic-symbolic')]
-
-    def select(self,obj):
-        transform_helper = TranformHelper()
-        transform_helper.set_object(obj)
-        self.target_area.add(transform_helper)
-
-        print(obj)
 
     def export_svg(self,file_name):
         import cairo
@@ -781,7 +819,7 @@ class Engravtor(gfx.WorldObject):
                 self.line = gfx.Line(gfx.Geometry(positions=[pos]),gfx.LineMaterial(thickness=self.light_spot_size,thickness_space='world',color='red'))
 
                 origin = self.laser_aperture.local.position[:]
-                direction = self.focus.local.position[:]                
+                direction = self.focus.local.position[:]
                 self.laser = gfx.Line(gfx.Geometry(positions=[origin,direction]),gfx.LineMaterial(thickness=self.light_spot_size,thickness_space='world',color='red'))
                 self.target_area.add(self.laser)
             elif cmd == 'G1':
