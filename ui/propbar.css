@@ -11,3 +11,15 @@
 .actor:hover {
     border: @theme_selected_fg_color solid 0.2mm;
 }
+
+.del {
+    background: red;
+}
+
+.del:hover {
+    background-color: #FF5733; 
+}
+
+.del:active {
+  background-color: red;
+}

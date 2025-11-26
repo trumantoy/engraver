@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.5.47",
+		"generator":"Khronos glTF Blender I/O v4.5.48",
 		"version":"2.0"
 	},
 	"scene":0,
@@ -1002,15 +1002,9 @@
 		{
 			"camera":1,
 			"name":"\u89c2\u5bdf\u70b9",
-			"rotation":[
-				0.2765333652496338,
-				0,
-				0,
-				0.9610043168067932
-			],
 			"translation":[
 				0,
-				-0.1579478532075882,
+				-0.05829170346260071,
 				0.13293634355068207
 			]
 		},

@@ -10,7 +10,7 @@ from pygfx.utils.transform import AffineTransform
 import pylinalg as la
 from importlib.resources import files
 import numpy as np
-
+from PIL import Image
 
 class OriginMaterial(Material):
     """最简点材质：统一颜色与尺寸（screen-space）。"""
@@ -456,7 +456,7 @@ class TranformHelper(gfx.WorldObject):
 
                 intersection = np.dot(a,b) >= 0 and np.dot(b,c) >= 0 and np.dot(c,d) >= 0 and np.dot(d,a) >= 0
                 if intersection: 
-                    self._ref = dict(kind=obj.name,world_pos=world_pos,screen_pos=screen_pos)
+                    self._ref = dict(kind=obj.name,world_pos=world_pos,screen_pos=screen_pos,rotation_pos=self.rotation.world.position,euler_z=self.world.euler_z)
                     break
 
             if not self._ref:
@@ -473,19 +473,19 @@ class TranformHelper(gfx.WorldObject):
                 self._ref['world_pos'] = world_pos
             elif self._ref['kind'] == 'rotate':
                 center = self._object_to_control.world.position
-                dir = world_pos - center
+                dir = self._ref['rotation_pos'] - center
                 dir = dir / np.linalg.norm(dir)
-                dir2 = self.rotation.world.position - center
+                dir2 = world_pos - center
                 dir2 = dir2 / np.linalg.norm(dir2)
-                dir2[2] = dir[2] = 0
-                offset = min(np.dot(dir,dir2),1.000)
-                offset = np.arccos(offset)
+                offset = np.dot(dir,dir2)
+                if 1 - offset < 0.001: offset = 0
+                elif 1 + offset < 0.001: offset = np.deg2rad(180)
+                else: offset = np.arccos(offset)
                 aspect = np.cross(dir,dir2)
                 aspect = aspect / np.linalg.norm(aspect)
-                if aspect[2] > 0: offset = -offset
-                self.local.euler_z += offset
-                self._object_to_control.local.euler_z += offset
-                self._ref['screen_pos'] = screen_pos
+                if aspect[2] < 0: offset = -offset
+                self.world.euler_z = self._ref['euler_z'] + offset
+                self._object_to_control.world.euler_z = self._ref['euler_z'] + offset
             elif self._ref['kind'] == 'scale':
                 center = self._object_to_control.world.position
                 dir = self._ref['world_pos'] - center
@@ -497,11 +497,11 @@ class TranformHelper(gfx.WorldObject):
                 self._ref['world_pos'] = world_pos
         elif event.type == "pointer_up":
             self._ref = None
-        
+
         return True
 
 class Label(gfx.WorldObject):
-    def __init__(self,text,font_size,family,*args,**kwargs):
+    def __init__(self,text,font_size,family,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
 
         self.text = text
@@ -513,7 +513,7 @@ class Label(gfx.WorldObject):
         
         # 配置与最终绘制一致的字体
         temp_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        temp_ctx.set_font_size(font_size)
+        temp_ctx.set_font_size(self.font_size)
         
         # 获取文字的详细边界信息（核心参数）
         text_info = temp_ctx.text_extents(text)
@@ -532,7 +532,7 @@ class Label(gfx.WorldObject):
 
         # 5. 配置字体（与临时上下文一致，确保尺寸匹配）
         final_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        final_ctx.set_font_size(font_size)
+        final_ctx.set_font_size(self.font_size)
 
         # 6. 修正文字位置：抵消y_bearing偏移，确保文字顶部贴合图片上边框
         # x起点：0（文字左边缘=图片左边缘）
@@ -545,27 +545,35 @@ class Label(gfx.WorldObject):
         final_ctx.move_to(text_x, text_y)
         final_ctx.show_text(text)
         argb_array = np.frombuffer(final_surface.get_data(), dtype=np.uint8).reshape((img_height, img_width, 4))
+
         tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
-        tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map))
+        tex_map = gfx.TextureMap(tex)
+        width = img_width * pixelsize / 1000
+        height = img_height * pixelsize / 1000
+        
+        self.obj = obj = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(obj)
 
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
 
 class Bitmap(gfx.WorldObject):
-    def __init__(self):
+    def __init__(self,pixelsize,im = None):
         super().__init__()
-        self.im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
-        tex = gfx.Texture(self.im,dim=2)
+        if im is None:
+            im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
+
+        height = im.shape[0] * pixelsize / 1000
+        width = im.shape[1] * pixelsize / 1000
+        tex = gfx.Texture(im,dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = gfx.Mesh(gfx.plane_geometry(0.02,0.02),gfx.MeshBasicMaterial(pick_write=True,map=tex_map)) 
+        self.obj = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False)) 
         self.add(self.obj)
+        self.im = im
 
     def get_image(self):
         return self.im.astype(np.uint8)
     
-
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
 
@@ -613,12 +621,6 @@ class Engravtor(gfx.WorldObject):
         self.selected_func = None
         self.transformed_func = None
 
-    def set_selected_func(self,func):
-        self.selected_func = func
-
-    def set_transformed_func(self,func):
-        self.transformed_func = func
-
     def _process_event(self, event : gfx.Event):
         screen_xy = np.array([event.x,event.y,0,1])
         x_dim, y_dim = self.persp_camera.logical_size
@@ -645,7 +647,7 @@ class Engravtor(gfx.WorldObject):
 
         if self.transform_helper:
             if self.transform_helper._process_event(event,world_pos,self.persp_camera):
-                if self.transformed_func: self.transformed_func(self.transform_helper._object_to_control)
+                self.transformed_func(self.transform_helper._object_to_control)
                 return
             
         selected_items = []
@@ -676,7 +678,6 @@ class Engravtor(gfx.WorldObject):
                 intersection = np.dot(a,b) > 0 and np.dot(b,c) > 0 and np.dot(c,d) > 0 and np.dot(d,a)
                 if intersection:
                     selected_items.append(obj)
-                    if self.selected_func: self.selected_func(obj)
                     break
             
             if self.transform_helper:
@@ -686,8 +687,11 @@ class Engravtor(gfx.WorldObject):
             if selected_items:
                 self.transform_helper = TranformHelper()
                 self.transform_helper.set_ref_object(selected_items[0])
-                self.target_area.add(self.transform_helper)
                 self.transform_helper._process_event(event,world_pos,self.persp_camera)
+                self.target_area.add(self.transform_helper)
+                self.selected_func(self.transform_helper._object_to_control)
+            else:
+                self.selected_func(None)
                     
     def step(self,dt):
         if self.steps:
@@ -721,12 +725,6 @@ class Engravtor(gfx.WorldObject):
         self.target = target
         self.target_area.add(target)
     
-    def unselect_all(self,parent : gfx.WorldObject):
-        for obj in parent.children:
-            if TranformHelper in type(obj).__mro__:
-                obj : TranformHelper
-                obj.set_object(None)
-
     def get_viewport(self):
         return [self.persp_camera]
 
@@ -735,24 +733,21 @@ class Engravtor(gfx.WorldObject):
             aabb = self.target.get_geometry_bounding_box()
             target_height = (aabb[1][2] - aabb[0][2])
             
-            element = Label('中',100 / self.pixelsize,'KaiTi',name='文本')
-            element.local.z = target_height + 0.00001
-            element._camera = self.persp_camera
+            element = Label('中国智造',72,'KaiTi',self.pixelsize,name='文本')
+            element.local.z = target_height
             self.target_area.add(element)
             return element 
 
-        def bitmap():
+        def bitmap(im):
             target = self.target
             aabb = target.get_geometry_bounding_box()
             target_height = (aabb[1][2] - aabb[0][2])
-            
-            element = Bitmap()
-            element.local.z = target_height + 0.00001
-            element._camera = self.persp_camera
+            element = Bitmap(self.pixelsize,im)
+            element.local.z = target_height
             self.target_area.add(element)
             return element 
 
-        return [('文本',label,'format-text-bold'),('位图',bitmap,'image-x-generic-symbolic')]
+        return [('文本',label,'format-text-bold'),('图片',bitmap,'image-x-generic-symbolic')]
 
     def export_svg(self,file_name):
         import cairo
@@ -786,9 +781,8 @@ class Engravtor(gfx.WorldObject):
                     width = int((aabb[1][0] - aabb[0][0]) * 1000 / self.pixelsize)
                     height = int((aabb[1][1] - aabb[0][1]) * 1000 / self.pixelsize)
 
-                    import PIL.Image
-                    image = PIL.Image.fromarray(obj.get_image())
-                    image = image.resize((width,height),resample=PIL.Image.Resampling.NEAREST)
+                    image = Image.fromarray(obj.get_image())
+                    image = image.resize((width,height),resample=Image.Resampling.NEAREST)
                     image = image.convert('RGBA')
                     rgba_array = np.array(image)
                     

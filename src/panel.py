@@ -32,9 +32,6 @@ class Panel (Gtk.Box):
         self.provider.load_from_path('ui/panel.css')
         Gtk.StyleContext.add_provider_for_display(self.get_display(),self.provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-
-        
-        
         # self.model = Gio.ListStore(item_type=GObject.Object)
         # self.tree_model = Gtk.TreeListModel.new(self.model,passthrough=False,autoexpand=False,create_func=lambda item: item.model)
 
@@ -90,7 +87,6 @@ class Panel (Gtk.Box):
     def on_activate_cursor_row(self,listbox, row):
         print(listbox)
 
-        
     # def listview_selection_changed(self, model, *args):
     #     i = model.get_selected()
     #     listviewitem = model.get_item(i)

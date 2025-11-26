@@ -30,7 +30,7 @@ class AppWindow (Gtk.ApplicationWindow):
     area : Gtk.DrawingArea = Gtk.Template.Child('widget')
     actionbar : Actionbar = Gtk.Template.Child('actionbar')
     hotbar : Hotbar = Gtk.Template.Child('hotbar')
-    # viewbar : Viewbar = Gtk.Template.Child('viewbar')
+    propbar : Propbar = Gtk.Template.Child('propbar')
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
@@ -49,7 +49,7 @@ class AppWindow (Gtk.ApplicationWindow):
         click_controller = Gtk.GestureClick.new()
         click_controller.set_button(1)
         click_controller.connect("pressed", lambda sender,n_press,x,y: self.renderer.convert_event(dict(event_type='pointer_down',x=x ,y=y,button=3,buttons=(3,),time_stamp=time.perf_counter())))
-        click_controller.connect("released", lambda sender,n_press,x,y: self.renderer.convert_event(dict(event_type='pointer_up',x=x ,y=y,button=3,buttons=(3,),time_stamp=time.perf_counter())) or self.pick(x,y))
+        click_controller.connect("released", lambda sender,n_press,x,y: self.renderer.convert_event(dict(event_type='pointer_up',x=x ,y=y,button=3,buttons=(3,),time_stamp=time.perf_counter())))
 
         rotation_controller = Gtk.GestureClick.new()
         rotation_controller.set_button(2)
@@ -90,13 +90,12 @@ class AppWindow (Gtk.ApplicationWindow):
         self.editor.add(self.tool)
         
         self.camera_controller = gfx.OrbitController()
-        # self.camera_controller.add_camera(self.editor.persp_camera)
-        # self.camera_controller.add_camera(self.editor.ortho_camera)
         for c in self.tool.get_viewport(): self.camera_controller.add_camera(c)
-
-        # self.panel.add(self.tool)
         self.hotbar.set_items(self.tool.get_hot_items())
-        # self.hotbar.connect('item_added',lambda sender,obj: self.panel.add(obj,self.tool))
+
+        self.tool.selected_func = self.selected_func
+        self.tool.transformed_func = self.transformed_func
+        self.propbar.connect('item-removed', self.item_removed)
 
         GLib.timeout_add(1000/180,lambda: self.editor.step() or True)
 
@@ -108,31 +107,6 @@ class AppWindow (Gtk.ApplicationWindow):
 
         self.prev_width = width
         Gtk.ApplicationWindow.do_size_allocate(self,width,height,baseline)
-
-    def pick(self,x,y):
-        info = self.renderer.get_pick_info([x,y])
-        # self.tool.select(info['world_object'])
-
-        # GLib.timeout_add(10,lambda: self.camera_controller.remove_camera(camera))
-        # if self.panel.selected_item:
-        #     self.panel.selected_item.obj.set_bounding_box_visible(False)
-
-        # obj = info['world_object']
-        # item = None
-
-        # if obj:
-        #     obj.set_bounding_box_visible(True)
-        #     item = self.panel.get(obj.name)
-        #     if item.parent:
-        #         item.parent.row.set_expanded(True)
-            
-        #     i = item.row.get_position()
-        #     self.panel.listview.scroll_to(i, Gtk.ListScrollFlags.SELECT)
-        # else:
-        #     self.panel.selection_model.unselect_all()
-        # self.panel.selected_item = item
-
-    
 
     def draw(self,area, cr : cairo.Context, area_w, area_h):
         width,height = self.canvas.get_physical_size()
@@ -158,6 +132,19 @@ class AppWindow (Gtk.ApplicationWindow):
         cr.paint()
 
         GLib.idle_add(area.queue_draw)
+
+    def selected_func(self,obj):
+        if obj: self.propbar.set_obj(obj)
+        self.propbar.set_visible(obj)
+
+    def transformed_func(self,obj):
+        self.propbar.set_obj(obj)
+
+    def item_removed(self,sender,obj):
+        self.tool.target_area.remove(self.tool.transform_helper)
+        self.tool.transform_helper = None
+        self.tool.target_area.remove(obj)
+        self.propbar.set_visible(False)
 
     def file_import(self, sender, args):
         dialog = Gtk.FileDialog()

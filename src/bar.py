@@ -5,7 +5,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk, Gio
 
-from scipy.spatial import Delaunay
+from PIL import Image
 from simtoy import *
 from panel import *
 
@@ -157,23 +157,87 @@ class Hotbar (Gtk.ScrolledWindow):
             widget = next_widget
 
         for text,action,icon in items:
-            def callback(sender,f):
-                self.emit('item_added', f())
+            def callback(sender,text,obj_make):
+                if text == '图片':
+                    self.image_add(obj_make)
+                else:
+                    obj_make()
+
             button = Gtk.Button()
-            button.connect('clicked',callback, action)
+            button.connect('clicked',callback, text, action)
             button.set_label(text)
             button.set_size_request(50,50)
             if icon: button.set_icon_name(icon)
             self.tools.append(button)
+    
+    def image_add(self,obj_make):
+        dialog = Gtk.FileDialog()
+        dialog.set_modal(True)
 
+        filter_text = Gtk.FileFilter()
+        filter_text.set_name("图片文件")
+        filter_text.add_pattern("*.png")
+        filter_text.add_pattern("*.jpg")
+        filter_text.add_pattern("*.jpeg")
+        
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(filter_text)
+        dialog.set_filters(filters)
+        dialog.set_default_filter(filter_text)
+
+        def open_file(dialog, result): 
+            file_path = None
+            try:
+                file = dialog.open_finish(result)
+                file_path = file.get_path()
+            except:
+                return
+            else:
+                im = Image.open(file_path)
+                image_array = np.array(im)
+                obj_make(image_array)
+
+        dialog.open(None, None, open_file) 
 
 
 @Gtk.Template(filename='ui/propbar.ui')
 class Propbar (Gtk.ScrolledWindow):
     __gtype_name__ = "Propbar"
     tools = Gtk.Template.Child('tools')
+    spin_x = Gtk.Template.Child('x')
+    spin_y = Gtk.Template.Child('y')
+    spin_w = Gtk.Template.Child('w')
+    spin_h = Gtk.Template.Child('h')
+    spin_rotate = Gtk.Template.Child('rotate')
+    entry_text = Gtk.Template.Child('text')
+    btn_remove = Gtk.Template.Child('remove')
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
         provider.load_from_path('ui/propbar.css')
         Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+    @GObject.Signal(return_type=bool, arg_types=(object,))
+    def item_removed(self,*args): 
+        pass
+
+    @Gtk.Template.Callback()
+    def btn_remove_clicked(self,button):
+        self.emit('item-removed',self.obj)
+
+    def set_obj(self,obj):
+        self.obj = obj
+        self.spin_x.set_value(obj.local.position[0] * 1000)
+        self.spin_y.set_value(obj.local.position[1] * 1000)
+        aabb = self.obj.get_geometry_bounding_box()
+        width = aabb[1][0] - aabb[0][0]
+        height = aabb[1][1] - aabb[0][1]
+        self.spin_w.set_value(width * obj.local.scale[0] * 1000)
+        self.spin_h.set_value(height * obj.local.scale[1] * 1000)
+        self.spin_rotate.set_value(-m.degrees(obj.local.euler_z))
+
+        if obj.__class__.__name__ == 'Label':
+            self.entry_text.set_text(obj.text)
+            obj.font_size
+            obj.family
+

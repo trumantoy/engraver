@@ -118,13 +118,12 @@
               </object>
             </child>
 
-            <!-- 操作栏 -->
             <child type="overlay">
               <object class="Propbar" id="propbar">
                 <property name="margin-start">60</property>
                 <property name="halign">start</property>
                 <property name="valign">start</property>
-                <property name="visible">True</property>
+                <property name="visible">False</property>
                 <property name="opacity">0.8</property>
               </object>
             </child>

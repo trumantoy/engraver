@@ -610,7 +610,7 @@
                         <style><class name="linked"/></style>
                         <child>
                             <object class="GtkButton">
-                                <style><class name="green-btn"></class></style>
+                                <style><class name="green-btn"/></style>
                                 <property name="label">加工</property>
                                 <property name="hexpand">True</property>
                                 <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
