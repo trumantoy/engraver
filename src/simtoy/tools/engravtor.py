@@ -687,8 +687,8 @@ class Engravtor(gfx.WorldObject):
             if selected_items:
                 self.transform_helper = TranformHelper()
                 self.transform_helper.set_ref_object(selected_items[0])
-                self.transform_helper._process_event(event,world_pos,self.persp_camera)
                 self.target_area.add(self.transform_helper)
+                self.transform_helper._process_event(event,world_pos,self.persp_camera)
                 self.selected_func(self.transform_helper._object_to_control)
             else:
                 self.selected_func(None)

@@ -21,7 +21,7 @@
                             <object class="GtkBox">                     
                                 <child>
                                     <object class="GtkLabel">
-                                        <property name="label">X (mm)</property>
+                                        <property name="label">X</property>
                                     </object>
                                 </child>
                                 <child>
@@ -48,7 +48,7 @@
                             <object class="GtkBox">
                                 <child>
                                     <object class="GtkLabel">
-                                        <property name="label">Y (mm)</property>
+                                        <property name="label">Y</property>
                                     </object>
                                 </child>
                                 <child>
@@ -82,7 +82,7 @@
                             <object class="GtkBox">
                                 <child>
                                     <object class="GtkLabel">
-                                        <property name="label">宽 (mm)</property>
+                                        <property name="label">宽</property>
                                     </object>
                                 </child>
                                 <child>
@@ -109,7 +109,7 @@
                             <object class="GtkBox">
                                 <child>
                                     <object class="GtkLabel">
-                                        <property name="label">高 (mm)</property>
+                                        <property name="label">高</property>
                                     </object>
                                 </child>
                                 <child>
@@ -143,7 +143,7 @@
                             <object class="GtkBox">
                                 <child>
                                     <object class="GtkLabel">
-                                        <property name="label">旋转 (°)</property>
+                                        <property name="label">旋转</property>
                                     </object>
                                 </child>
                                 <child>
@@ -191,13 +191,13 @@
 
                 <!-- 属性栏 -->
                 <child>
-                    <object class="GtkStack" id='panel'>
+                    <object class="GtkStack" id='stack'>
                         <property name="visible">True</property>
                         <property name="opacity">1</property>
 
                         <child>
                             <object class="GtkStackPage">
-                                <property name="name">文本</property>
+                                <property name="name">Label</property>
                                 <property name="child">
                                     <object class="GtkBox">
                                         <property name="orientation">horizontal</property>
@@ -230,22 +230,17 @@
                         </child>
                         <child>
                             <object class="GtkStackPage">
-                                <property name="name">图片</property>
+                                <property name="name">Bitmap</property>
                                 <property name="child">
                                     <object class="GtkBox">
                                         <property name="orientation">horizontal</property>
                                         <property name="spacing">5</property>
-                                        <child>
-                                            <object class="GtkLabel">
-                                                <property name="label">图片</property>
-                                            </object>
-                                        </child>
                                     </object>
                                 </property>
 
                             </object>
                         </child>
-                        <property name="visible-child-name">文本</property>
+                        <property name="visible-child-name">Label</property>
                     </object>
                 </child>
 

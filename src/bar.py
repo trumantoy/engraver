@@ -211,6 +211,7 @@ class Propbar (Gtk.ScrolledWindow):
     spin_rotate = Gtk.Template.Child('rotate')
     entry_text = Gtk.Template.Child('text')
     btn_remove = Gtk.Template.Child('remove')
+    stack = Gtk.Template.Child('stack')
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
@@ -240,4 +241,6 @@ class Propbar (Gtk.ScrolledWindow):
             self.entry_text.set_text(obj.text)
             obj.font_size
             obj.family
+
+        self.stack.set_visible_child_name(obj.__class__.__name__)
 
