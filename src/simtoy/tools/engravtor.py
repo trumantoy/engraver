@@ -12,358 +12,97 @@ from importlib.resources import files
 import numpy as np
 from PIL import Image
 
-class OriginMaterial(Material):
-    """最简点材质：统一颜色与尺寸（screen-space）。"""
+import serial
 
-    uniform_type = dict(
-        Material.uniform_type,
-        color="4xf4",
-        size="f4",
-    )
-
-    def __init__(self, *, color='black', size=5.0, **kwargs):
-        super().__init__(**kwargs)
-        self.color = gfx.Color('orange')
-        self.size = float(size)
-
-    @property
-    def color(self):
-        return tuple(self.uniform_buffer.data["color"])
-
-    @color.setter
-    def color(self, rgba):
-        self.uniform_buffer.data["color"] = rgba
-        self.uniform_buffer.update_full()
-
-    @property
-    def size(self):
-        return float(self.uniform_buffer.data["size"])
-
-    @size.setter
-    def size(self, v):
-        self.uniform_buffer.data["size"] = float(v)
-        self.uniform_buffer.update_full()
-
-    def _wgpu_get_pick_info(self, pick_value):
-        from pygfx.utils import unpack_bitfield
-        values = unpack_bitfield(pick_value, wobject_id=20, index=26, x=9, y=9)
-        return {
-            "vertex_index": values["index"],
-            "point_coord": (values["x"] - 256.0, values["y"] - 256.0),
-        }
-
-
-@register_wgpu_render_function(gfx.WorldObject, OriginMaterial)
-class OriginShader(BaseShader):
-    type = "render"
-
-    def __init__(self, wobject):
-        super().__init__(wobject)
-
-    def get_bindings(self, wobject, shared):
-        bindings = [
-            Binding("u_stdinfo", "buffer/uniform", shared.uniform_buffer),
-            Binding("u_wobject", "buffer/uniform", wobject.uniform_buffer),
-            Binding("u_material", "buffer/uniform", wobject.material.uniform_buffer),
-            Binding("s_positions", "buffer/read_only_storage", wobject.geometry.positions, "VERTEX"),
-        ]
-        bindings = {i: b for i, b in enumerate(bindings)}
-        self.define_bindings(0, bindings)
-        return {0: bindings}
-
-    def get_pipeline_info(self, wobject, shared):
-        return {
-            "primitive_topology": wgpu.PrimitiveTopology.triangle_list,
-            "cull_mode": wgpu.CullMode.none,
-        }
-
-    def get_render_info(self, wobject, shared):
-        offset, size = wobject.geometry.positions.draw_range
-        offset, size = offset * 6, size * 6
-        return {
-            "indices": (size, 1, offset, 0),
-            "render_mask": RenderMask.all,
-        }
-
-    def get_code(self):
-
-        return """
-            {$ include 'pygfx.std.wgsl' $}
-
-            // 顶点着色器输入结构体
-            struct VertexInput {
-                @builtin(vertex_index) index : u32,  // 当前处理的顶点索引（0, 1, 2, 3, 4, 5...）
-            };
-
-            @vertex
-            fn vs_main(in: VertexInput) -> Varyings {
-                // 获取逻辑屏幕的半尺寸，用于NDC到屏幕坐标的转换
-                let screen_factor: vec2<f32> = u_stdinfo.logical_size.xy / 2.0;
-                
-                // 将顶点索引转换为有符号整数
-                let index = i32(in.index);
-                
-                // 计算逻辑：每个"点"展开为6个顶点（两个三角形组成正方形）
-                // node_index: 这是第几个逻辑点（0, 1, 2...）
-                // vertex_index: 该点内的第几个顶点（0,1,2,3,4,5）
-                let node_index = index / 6;      // 整数除法，得到点索引
-                let vertex_index = index % 6;    // 取余，得到点内顶点索引
-                
-                // 从存储缓冲区读取第node_index个点的模型空间位置
-                let pos_m = load_s_positions(node_index);
-                
-                // 模型空间 -> 世界空间：应用对象的变换矩阵
-                let pos_w = u_wobject.world_transform * vec4<f32>(pos_m.xyz, 1.0);
-                
-                // 世界空间 -> 相机空间：应用相机视图矩阵
-                let pos_c = u_stdinfo.cam_transform * pos_w;
-                
-                // 相机空间 -> 裁剪空间：应用投影矩阵
-                let pos_n = u_stdinfo.projection_transform * pos_c;
-                
-                // 裁剪空间 -> 逻辑屏幕坐标
-                // 1. 透视除法：pos_n.xy / pos_n.w 得到NDC坐标 [-1,1]
-                // 2. 映射到 [0,1]：+ 1.0
-                // 3. 缩放到屏幕尺寸：* screen_factor
-                let pos_s = (pos_n.xy / pos_n.w + 1.0) * screen_factor;
-                
-                // 计算点的大小（半径，逻辑像素）
-                let half = 5.0 * u_material.size;
-                
-                // 定义6个顶点的相对偏移，形成两个三角形组成的正方形
-                // 顶点顺序：左下、右下、左上、左上、右下、右上
-                // 这样绘制两个三角形：左下-右下-左上 和 左上-右下-右上
-                var deltas = array<vec2<f32>, 6>(
-                    vec2<f32>(-1.0, -1.0),  // 左下
-                    vec2<f32>( 1.0, -1.0),  // 右下  
-                    vec2<f32>(-1.0,  1.0),  // 左上
-                    vec2<f32>(-1.0,  1.0),  // 左上（重复，第二个三角形的起点）
-                    vec2<f32>( 1.0, -1.0),  // 右下（重复，第二个三角形的第二个点）
-                    vec2<f32>( 1.0,  1.0),  // 右上
-                );
-                
-                // 根据当前顶点索引，获取对应的偏移量并缩放到点的大小
-                let delta = deltas[vertex_index] * half;
-                
-                // 将偏移量应用到屏幕坐标，得到当前顶点的最终屏幕位置
-                let the_pos_s = pos_s + delta;
-                
-                // 屏幕坐标 -> NDC坐标（保持与中心点相同的深度）
-                // 1. 屏幕坐标归一化到 [0,1]：the_pos_s / screen_factor
-                // 2. 映射到 [-1,1]：- 1.0
-                // 3. 恢复裁剪空间的w分量：* pos_n.w
-                // 4. z分量置零，让原点永远在最前面
-                let the_pos_n = vec4<f32>((the_pos_s / screen_factor - 1.0) * pos_n.w, 0, pos_n.w);
-                
-                // 构建传递给片段着色器的插值变量
-                var varyings: Varyings;
-                
-                // 设置裁剪空间位置（GPU需要这个进行光栅化）
-                varyings.position = vec4<f32>(the_pos_n);
-                
-                // 设置世界空间位置（用于后续计算，如光照、深度等）
-                varyings.world_pos = vec3<f32>(ndc_to_world_pos(the_pos_n));
-                
-                // 设置点内坐标（相对于点中心的偏移，物理像素单位）
-                // 用于片段着色器中计算SDF和描边
-                let l2p = u_stdinfo.physical_size.x / u_stdinfo.logical_size.x;  // 逻辑到物理像素比例
-                varyings.pointcoord_p = vec2<f32>(delta * l2p);  // 转换为物理像素
-                
-                // 设置点的物理像素尺寸
-                varyings.size_p = f32(u_material.size * l2p);
-                varyings.pick_idx = u32(node_index);
-                return varyings;
-            }
-
-            @fragment
-            fn fs_main(varyings: Varyings) -> FragmentOutput {
-                // 构建片段着色器输出
-                var out: FragmentOutput;
-                
-                // 计算圆形SDF：到边缘的有向距离
-                // length(pointcoord) 计算到中心的欧几里得距离
-                // 0.5 * size_p 是圆的半径
-                // 正值：点在圆外部，负值：点在圆内部，0值：点在圆边界上
-                var dist_to_edge = length(varyings.pointcoord_p) - 0.5 * varyings.size_p;
-                
-                // 描边逻辑：判断当前片段是否在描边范围内
-                var l2p = u_stdinfo.physical_size.x / u_stdinfo.logical_size.x;
-                var edge_width = 0.75 * l2p;  // 描边宽度（物理像素）
-                
-                // 判断片段类型
-                var is_edge = abs(dist_to_edge) < edge_width;    // 是否在描边范围内
-                var is_inside = dist_to_edge < 0.0;              // 是否在点内部
-                
-                // 根据片段位置设置颜色
-                var final_color: vec4<f32>;
-                if (is_edge) {
-                    // 描边颜色：黑色
-                    final_color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-                } else if (is_inside) {
-                    // 点内部：使用材质颜色
-                    let col = u_material.color;
-                    // 将sRGB颜色转换为物理线性空间，保持alpha不变
-                    final_color = vec4<f32>(srgb2physical(col.rgb), col.a);
-                } else {
-                    final_color = vec4<f32>(0.0, 0.0, 0.0, 0.0);
-                }
-                
-                let pointcoord: vec2<f32> = varyings.pointcoord_p / l2p;
-
-                // 设置最终输出颜色
-                out.color = final_color;
-
-                $$ if write_pick
-                out.pick = (
-                    pick_pack(u32(u_wobject.id), 20) +
-                    pick_pack(varyings.pick_idx, 26) +
-                    pick_pack(u32(pointcoord.x + 256.0), 9) +
-                    pick_pack(u32(pointcoord.y + 256.0), 9)
-                );
-                $$ endif
-                return out;
-            }
-        """
-
-
-class AxisMaterial(Material):
-    """坐标轴材质：支持颜色和线宽设置"""
-    uniform_type = dict(
-        Material.uniform_type,
-        color="4xf4",
-        size='f4'
-    )
-
-    def __init__(self, *, color,size, **kwargs):
-        super().__init__(** kwargs)
-        self.color = gfx.Color(color)
-        self.size = size
-
-    @property
-    def color(self):
-        return tuple(self.uniform_buffer.data["color"])
-
-    @color.setter
-    def color(self, rgba):
-        self.uniform_buffer.data["color"] = rgba
-        self.uniform_buffer.update_full()
-
-    @property
-    def size(self):
-        return tuple(self.uniform_buffer.data["color"])
-
-    @size.setter
-    def size(self, value):
-        self.uniform_buffer.data["size"] = value
-        self.uniform_buffer.update_full()
-
-    def _wgpu_get_pick_info(self, pick_value):
-        from pygfx.utils import unpack_bitfield
-        values = unpack_bitfield(pick_value, wobject_id=20, index=26, x=9, y=9)
-        return {
-            "vertex_index": values["index"],
-            "point_coord": (values["x"] - 256.0, values["y"] - 256.0),
-        }
-
-@register_wgpu_render_function(WorldObject, AxisMaterial)
-class AxisShader(BaseShader):
-    type = "render"
-
-    def __init__(self, wobject):
-        super().__init__(wobject)
-
-    def get_bindings(self, wobject, shared):
-        bindings = [
-            Binding("u_stdinfo", "buffer/uniform", shared.uniform_buffer),
-            Binding("u_wobject", "buffer/uniform", wobject.uniform_buffer),
-            Binding("u_material", "buffer/uniform", wobject.material.uniform_buffer),
-            Binding("s_positions", "buffer/read_only_storage", wobject.geometry.positions, "VERTEX"),
-            Binding("s_indices", "buffer/read_only_storage", wobject.geometry.indices, "VERTEX")
-        ]
-        bindings = {i: b for i, b in enumerate(bindings)}
-        self.define_bindings(0, bindings)
-        return {0: bindings}
-
-    def get_pipeline_info(self, wobject, shared):
-        return {
-            "primitive_topology": wgpu.PrimitiveTopology.triangle_list,
-            "cull_mode": wgpu.CullMode.none,
-        }
-
-    def get_render_info(self, wobject, shared):
-        geometry = wobject.geometry
-        material = wobject.material
+class USBController:
+    def __init__(self):
+        """初始化Grbl控制器连接"""
+        self.serial = None
         
-        offset, size = geometry.indices.draw_range
-        offset, size = 6 * offset, 6 * size
+    def connect(self,port):
+        """连接到Grbl控制器"""
+        try:
+            # 初始化串口（根据实际设备修改参数）
+            self.serial = serial.Serial(port=port,baudrate=9600,timeout=1)
 
-        return {
-            "indices": (size, 1, offset, 0),
-            "render_mask": RenderMask.all,
-        }
+            # 检查串口是否打开
+            if not self.serial.is_open:
+                self.serial = None
+                print("串口打开失败") 
+                return False
+            
+        except Exception as e:
+            self.serial = None
+            print(f"连接失败: {str(e)}")
+            return False
 
-    def get_code(self):
-        return """
-            {$ include 'pygfx.std.wgsl' $}
+        print(f"串口 {self.serial.name} 已打开")
+        return True
+    
+    def disconnect(self):
+        """断开与Grbl控制器的连接"""
+        if self.serial:
+            self.serial.close()
+            print("已断开与Grbl控制器的连接")
 
-            struct VertexInput {
-                @builtin(vertex_index) index : u32,
-            };
 
-            @vertex
-            fn vs_main(in: VertexInput) -> Varyings {
-                let mvp = u_stdinfo.projection_transform * u_stdinfo.cam_transform * u_wobject.world_transform;
-                var origin_screen = mvp * vec4<f32>(0,0,0,1);
-                var x_screen = mvp * vec4<f32>(0.01,0,0,1); 
-                var y_screen = mvp * vec4<f32>(0,0.01,0,1); 
-                var z_screen = mvp * vec4<f32>(0,0,0.01,1); 
+    def set_axes_invert(self):
+        """设置轴 invert"""
+        req = f'$240P2P6P5\n'.encode()
+        print(req)
+        self.serial.write(req)
+        res = self.serial.readline()
+        print(res)
 
-                var x_direction = (vec3<f32>(x_screen.xyz / x_screen.w) - vec3<f32>(origin_screen.xyz / origin_screen.w)); 
-                var y_direction = (vec3<f32>(y_screen.xyz / y_screen.w) - vec3<f32>(origin_screen.xyz / origin_screen.w));
-                var z_direction = (vec3<f32>(z_screen.xyz / z_screen.w) - vec3<f32>(origin_screen.xyz / origin_screen.w));
-
-                var size_1_radius = max(length(x_direction),max(length(y_direction),length(z_direction)));
-                var scale = u_material.size / u_stdinfo.logical_size.y / size_1_radius;
-                
-                let index = i32(in.index);
-                let face_index = index / 6;
-                var sub_index = index % 6;
-                
-                let vii = load_s_indices(face_index);
-                let i0 = i32(vii[sub_index]);
-                var pos_n = mvp * vec4<f32>(load_s_positions(i0) * scale ,1.0);
-                pos_n.z = 0;
-
-                var varyings: Varyings;
-                varyings.position = vec4<f32>(pos_n);
-                
-                let l2p = u_stdinfo.physical_size.x / u_stdinfo.logical_size.x;  // 逻辑到物理像素比例
-                varyings.pointcoord_p = vec2<f32>(load_s_positions(i0).xy * l2p);  // 转换为物理像素
-                
-                // 设置点的物理像素尺寸
-                varyings.pick_idx = u32(i0);
-                return varyings;
-            }
-
-            @fragment
-            fn fs_main(varyings: Varyings) -> FragmentOutput {
-                var out: FragmentOutput; 
-                out.color = vec4<f32>(u_material.color.xyz,1);
-
-                var l2p = u_stdinfo.physical_size.x / u_stdinfo.logical_size.x;
-                let pointcoord: vec2<f32> = varyings.pointcoord_p / l2p;
-
-                $$ if write_pick
-                out.pick = (
-                    pick_pack(u32(u_wobject.id), 20) +
-                    pick_pack(varyings.pick_idx, 26) +
-                    pick_pack(u32(pointcoord.x + 256.0), 9) +
-                    pick_pack(u32(pointcoord.y + 256.0), 9)
-                );
-                $$ endif
-                return out;
-            }
+    def set_process_params(self):
         """
+        T：参数识别 F:速度 S:功率 C:频率 D:占空比 E:开光延时
+        H:关光延时 U:跳转延时
+        单位F:mm/s S[0-100]% Cus Dus EHUms
+        1kHz占空比50%  C：1000 D：500
+        """
+
+        req = f'T0 C22\n'.encode()
+        print(req)
+        self.serial.write(req)
+        res = self.serial.readline()
+        print(res)
+    
+    def excute(self, lines):
+        queue_size = self.get_queue_size()
+        print('queue_size',queue_size)   
+
+        for line in lines:
+            req = f'{line}\n'.encode()
+            self.serial.write(req)
+        
+        for _ in range(len(lines)):
+            self.serial.readline()
+    
+    def get_queue_size(self):
+        """获取Grbl接收缓存队列余量"""
+        req = '%\n'.encode()
+        print(req)
+        self.serial.write(req)
+        res = self.serial.readline()
+        print(res)
+        return int(res.decode().split(':')[1])
+    
+    def get_status(self):
+        """获取Grbl状态信息"""
+        if not self.connected:
+            print("未连接到控制器，请先连接")
+            return None
+            
+        try:
+            # 发送状态请求
+            self.serial.write(b'?')
+            response = self.serial.readline().decode('utf-8').strip()
+            return response
+        except Exception as e:
+            print(f"获取状态出错: {str(e)}")
+            return None
+
 
 class TranformHelper(gfx.WorldObject):
     def __init__(self, *args, **kwargs):
@@ -608,8 +347,6 @@ class Engravtor(gfx.WorldObject):
         # self.controller = gfx.OrbitController()
         # self.controller.add_camera(persp_camera)
         # self.controller.add_camera(ortho_camera)
-
-        self.controller = GrblController()
         
         geom = gfx.sphere_geometry(radius=0.0001)
         material = gfx.MeshBasicMaterial(color=(1, 0, 0, 1),flat_shading=True)
@@ -875,95 +612,4 @@ class Engravtor(gfx.WorldObject):
 
             self.steps.append(lambda: fun(i+len(lines)))
         self.steps.append(lambda: fun(0))
-    
 
-import serial
-
-class GrblController:
-    def __init__(self):
-        """初始化Grbl控制器连接"""
-        self.serial = None
-        
-    def connect(self,port):
-        """连接到Grbl控制器"""
-        try:
-            # 初始化串口（根据实际设备修改参数）
-            self.serial = serial.Serial(port=port,baudrate=9600,timeout=1)
-
-            # 检查串口是否打开
-            if not self.serial.is_open:
-                self.serial = None
-                print("串口打开失败") 
-                return False
-            
-        except Exception as e:
-            self.serial = None
-            print(f"连接失败: {str(e)}")
-            return False
-
-        print(f"串口 {self.serial.name} 已打开")
-        return True
-    
-    def disconnect(self):
-        """断开与Grbl控制器的连接"""
-        if self.serial:
-            self.serial.close()
-            print("已断开与Grbl控制器的连接")
-
-
-    def set_axes_invert(self):
-        """设置轴 invert"""
-        req = f'$240P2P6P5\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-
-    def set_process_params(self):
-        """
-        T：参数识别 F:速度 S:功率 C:频率 D:占空比 E:开光延时
-        H:关光延时 U:跳转延时
-        单位F:mm/s S[0-100]% Cus Dus EHUms
-        1kHz占空比50%  C：1000 D：500
-        """
-
-        req = f'T0 C22\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-    
-    def excute(self, lines):
-        queue_size = self.get_queue_size()
-        print('queue_size',queue_size)   
-
-        for line in lines:
-            req = f'{line}\n'.encode()
-            self.serial.write(req)
-        
-        for _ in range(len(lines)):
-            self.serial.readline()
-    
-    def get_queue_size(self):
-        """获取Grbl接收缓存队列余量"""
-        req = '%\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-        return int(res.decode().split(':')[1])
-    
-    def get_status(self):
-        """获取Grbl状态信息"""
-        if not self.connected:
-            print("未连接到控制器，请先连接")
-            return None
-            
-        try:
-            # 发送状态请求
-            self.serial.write(b'?')
-            response = self.serial.readline().decode('utf-8').strip()
-            return response
-        except Exception as e:
-            print(f"获取状态出错: {str(e)}")
-            return None

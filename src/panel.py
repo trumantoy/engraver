@@ -81,7 +81,7 @@ class Panel (Gtk.Box):
     def device_discovery_closed(self, dlg):
         if dlg.result:
             print(dlg.result)
-
+            
 
     @Gtk.Template.Callback()
     def on_activate_cursor_row(self,listbox, row):

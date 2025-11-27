@@ -61,5 +61,3 @@ class DeviceDiscoveryDialog (Gtk.Window):
         model = Gtk.StringList.new(devices)
         selection_model = self.lsv_usb_list.get_model()
         selection_model.set_model(model)
-
-    
