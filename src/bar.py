@@ -227,6 +227,7 @@ class Propbar (Gtk.ScrolledWindow):
         self.emit('item-removed',self.obj)
 
     def set_obj(self,obj):
+        if not obj: return
         self.obj = obj
         self.spin_x.set_value(obj.local.position[0] * 1000)
         self.spin_y.set_value(obj.local.position[1] * 1000)

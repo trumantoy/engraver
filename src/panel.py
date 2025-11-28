@@ -14,6 +14,9 @@ class Panel (Gtk.Box):
     provider = Gtk.CssProvider.new()
     btn_device_manager = Gtk.Template.Child('device_manager')
     btn_device_discovery = Gtk.Template.Child('device_discovery')
+    stack = Gtk.Template.Child('stack')
+    label_kind = Gtk.Template.Child('kind')
+    image_icon = Gtk.Template.Child('icon')
 
     # listview = Gtk.Template.Child('geoms')
     # expander_device = Gtk.Template.Child('expander_device')
@@ -86,6 +89,22 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def on_activate_cursor_row(self,listbox, row):
         print(listbox)
+
+    def set_obj(self,obj):
+        self.stack.set_visible_child_name('参数' if obj else '总览')
+        if not obj: return
+
+        self.obj = obj
+        if obj.__class__.__name__ == 'Label':
+            self.label_kind.set_label('文本')
+            self.image_icon.set_from_icon_name('format-text-bold')
+        else:
+            self.label_kind.set_label('图片')
+            self.image_icon.set_from_icon_name('image-x-generic-symbolic')
+    
+    def set_params(self,params):
+        self.params = params
+        
 
     # def listview_selection_changed(self, model, *args):
     #     i = model.get_selected()

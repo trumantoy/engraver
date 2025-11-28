@@ -429,7 +429,7 @@ class Engravtor(gfx.WorldObject):
                 self.selected_func(self.transform_helper._object_to_control)
             else:
                 self.selected_func(None)
-                    
+    
     def step(self,dt):
         if self.steps:
             self.steps[0]()
@@ -485,6 +485,14 @@ class Engravtor(gfx.WorldObject):
             return element 
 
         return [('文本',label,'format-text-bold'),('图片',bitmap,'image-x-generic-symbolic')]
+    
+    def get_items(self):
+        items = []
+        for obj in self.target_area.children:
+            if type(obj) != Label and type(obj) != Bitmap:
+                continue
+            items.append(obj)
+        return items
 
     def export_svg(self,file_name):
         import cairo
