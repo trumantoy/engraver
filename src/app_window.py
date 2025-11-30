@@ -8,6 +8,7 @@ import time
 import cairo
 import numpy as np
 import pygfx as gfx
+from rendercanvas.offscreen import RenderCanvas
 from pathlib import Path
 import os
 import sys
@@ -37,7 +38,7 @@ class AppWindow (Gtk.ApplicationWindow):
         Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         self.scene = self.editor = Editor()
-        self.canvas = wgpu.gui.offscreen.WgpuCanvas(size=(1024,768))
+        self.canvas = RenderCanvas(size=(1024,768))
         self.renderer = gfx.renderers.WgpuRenderer(self.canvas)
         
         self.panel : Panel = self.stack.get_visible_child()
@@ -112,7 +113,7 @@ class AppWindow (Gtk.ApplicationWindow):
         width,height = self.canvas.get_physical_size()
 
         if width != area_w or height != area_h: 
-            self.canvas = wgpu.gui.offscreen.WgpuCanvas(size=(area_w,area_h))
+            self.canvas = RenderCanvas(size=(area_w,area_h))
             self.renderer = gfx.renderers.WgpuRenderer(self.canvas)
             self.camera_controller.register_events(self.renderer)
         

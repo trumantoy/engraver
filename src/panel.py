@@ -15,6 +15,7 @@ class Panel (Gtk.Box):
     btn_device_manager = Gtk.Template.Child('device_manager')
     btn_device_discovery = Gtk.Template.Child('device_discovery')
     stack = Gtk.Template.Child('stack')
+    lstbox_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
 
@@ -102,8 +103,58 @@ class Panel (Gtk.Box):
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')
     
-    def set_params(self,params):
-        self.params = params
+    def set_params(self,items):
+        self.params = items
+        self.lstbox_params.remove_all()
+
+        for item in items:
+            box = Gtk.Box()
+            box.set_size_request(-1,80)
+            box.set_spacing(5)
+            img = Gtk.Image()
+            img.set_pixel_size(80)
+            img.set_from_icon_name('format-text-bold-symbolic')
+            box.append(img)
+
+            box_1 = Gtk.Box()
+            box_1.set_orientation(Gtk.Orientation.VERTICAL)
+            box_1.set_spacing(1)
+            box_1.set_hexpand(True)
+            box_1.set_valign(Gtk.Align.CENTER)
+
+            param = Gtk.Label()
+            param.set_label('<span size="large">线条雕刻</span>')
+            param.set_use_markup(True)
+            param.set_halign(Gtk.Align.START)
+            box_1.append(param)
+
+            param = Gtk.Label()
+            param.set_label('<span size="medium">蓝光</span>')
+            param.set_use_markup(True)
+            param.set_halign(Gtk.Align.START)
+            box_1.append(param)
+
+            box_11 = Gtk.Box()
+            box_11.set_spacing(20)
+            box_11.set_hexpand(True)
+            box_11.set_valign(Gtk.Align.CENTER)
+
+            param = Gtk.Label()
+            param.set_label('<span color="gray" size="medium">9%</span>')
+            param.set_use_markup(True)
+            param.set_halign(Gtk.Align.START)
+            box_11.append(param)
+
+            param = Gtk.Label()
+            param.set_label('<span color="gray" size="medium">20mm/s</span>')
+            param.set_use_markup(True)
+            param.set_halign(Gtk.Align.START)
+            box_11.append(param)
+            box_1.append(box_11)
+
+            box.append(box_1)
+            self.lstbox_params.append(box)
+
         
 
     # def listview_selection_changed(self, model, *args):
