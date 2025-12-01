@@ -18,6 +18,12 @@ class Panel (Gtk.Box):
     lstbox_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
+    btn_engraving_mode_outline = Gtk.Template.Child('a')
+    btn_engraving_mode_full = Gtk.Template.Child('b')
+    dp_light_source = Gtk.Template.Child('light_source')
+    spin_power = Gtk.Template.Child('power')
+    spin_speed = Gtk.Template.Child('speed')
+    swt_excutable = Gtk.Template.Child('excutable')
 
     # listview = Gtk.Template.Child('geoms')
     # expander_device = Gtk.Template.Child('expander_device')
@@ -31,6 +37,7 @@ class Panel (Gtk.Box):
 
     # menu_add = Gtk.Template.Child('popover_menu_add')
     # menu = Gtk.Template.Child('popover_menu')
+
 
     def __init__(self):
         self.provider.load_from_path('ui/panel.css')
@@ -99,59 +106,112 @@ class Panel (Gtk.Box):
         if obj.__class__.__name__ == 'Label':
             self.label_kind.set_label('文本')
             self.image_icon.set_from_icon_name('format-text-bold')
+            self.btn_engraving_mode_outline.set_sensitive(True)
+            if obj.params['engraving_mode'] == '线条雕刻':
+                self.btn_engraving_mode_outline.set_active(True)
+            else:
+                self.btn_engraving_mode_full.set_active(True)
         else:
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')
+            self.btn_engraving_mode_outline.set_sensitive(False)
+            self.btn_engraving_mode_full.set_active(True)
+        
+        self.dp_light_source.set_selected(0 if obj.params['light_source'] == '蓝光' else 1)
+        self.spin_power.set_value(obj.params['power'])
+        self.spin_speed.set_value(obj.params['speed'])
+        self.swt_excutable.set_active(obj.params['excutable'])
     
     def set_params(self,items):
-        self.params = items
         self.lstbox_params.remove_all()
 
         for item in items:
             box = Gtk.Box()
             box.set_size_request(-1,80)
             box.set_spacing(5)
-            img = Gtk.Image()
-            img.set_pixel_size(80)
-            img.set_from_icon_name('format-text-bold-symbolic')
+
+            if item.__class__.__name__ == 'Label':
+                img = Gtk.Image()
+                img.set_pixel_size(80)
+                img.set_from_icon_name('format-text-bold-symbolic')
+                
+                box_1 = Gtk.Box()
+                box_1.set_orientation(Gtk.Orientation.VERTICAL)
+                box_1.set_spacing(1)
+                box_1.set_hexpand(True)
+                box_1.set_valign(Gtk.Align.CENTER)
+
+                param = Gtk.Label()
+                param.set_label(f'<span size="large">{item.params["engraving_mode"]}</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_1.append(param)
+
+                param = Gtk.Label()
+                param.set_label(f'<span size="medium">{item.params["light_source"]}</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_1.append(param)
+
+                box_11 = Gtk.Box()
+                box_11.set_spacing(20)
+                box_11.set_hexpand(True)
+                box_11.set_valign(Gtk.Align.CENTER)
+
+                param = Gtk.Label()
+                param.set_label(f'<span color="gray" size="medium">{item.params["power"]}%</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_11.append(param)
+
+                param = Gtk.Label()
+                param.set_label(f'<span color="gray" size="medium">{item.params["speed"]}mm/s</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_11.append(param)
+                box_1.append(box_11)
+            else:
+                img = Gtk.Image()
+                img.set_pixel_size(80)
+                img.set_from_icon_name('image-x-generic-symbolic')
+                    
+                box_1 = Gtk.Box()
+                box_1.set_orientation(Gtk.Orientation.VERTICAL)
+                box_1.set_spacing(1)
+                box_1.set_hexpand(True)
+                box_1.set_valign(Gtk.Align.CENTER)
+
+                param = Gtk.Label()
+                param.set_label('<span size="large">雕刻</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_1.append(param)
+
+                param = Gtk.Label()
+                param.set_label(f'<span size="medium">{item.params["light_source"]}</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_1.append(param)
+
+                box_11 = Gtk.Box()
+                box_11.set_spacing(20)
+                box_11.set_hexpand(True)
+                box_11.set_valign(Gtk.Align.CENTER)
+
+                param = Gtk.Label()
+                param.set_label(f'<span color="gray" size="medium">{item.params["power"]}%</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_11.append(param)
+
+                param = Gtk.Label()
+                param.set_label(f'<span color="gray" size="medium">{item.params["speed"]}mm/s</span>')
+                param.set_use_markup(True)
+                param.set_halign(Gtk.Align.START)
+                box_11.append(param)
+                box_1.append(box_11)
+
             box.append(img)
-
-            box_1 = Gtk.Box()
-            box_1.set_orientation(Gtk.Orientation.VERTICAL)
-            box_1.set_spacing(1)
-            box_1.set_hexpand(True)
-            box_1.set_valign(Gtk.Align.CENTER)
-
-            param = Gtk.Label()
-            param.set_label('<span size="large">线条雕刻</span>')
-            param.set_use_markup(True)
-            param.set_halign(Gtk.Align.START)
-            box_1.append(param)
-
-            param = Gtk.Label()
-            param.set_label('<span size="medium">蓝光</span>')
-            param.set_use_markup(True)
-            param.set_halign(Gtk.Align.START)
-            box_1.append(param)
-
-            box_11 = Gtk.Box()
-            box_11.set_spacing(20)
-            box_11.set_hexpand(True)
-            box_11.set_valign(Gtk.Align.CENTER)
-
-            param = Gtk.Label()
-            param.set_label('<span color="gray" size="medium">9%</span>')
-            param.set_use_markup(True)
-            param.set_halign(Gtk.Align.START)
-            box_11.append(param)
-
-            param = Gtk.Label()
-            param.set_label('<span color="gray" size="medium">20mm/s</span>')
-            param.set_use_markup(True)
-            param.set_halign(Gtk.Align.START)
-            box_11.append(param)
-            box_1.append(box_11)
-
             box.append(box_1)
             self.lstbox_params.append(box)
 

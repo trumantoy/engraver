@@ -238,11 +238,21 @@ class TranformHelper(gfx.WorldObject):
             self._ref = None
 
         return True
+    
+class Element(gfx.WorldObject):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.params = dict()
+        self.params['power'] = 100
+        self.params['excutable'] = True
+        self.params['light_source'] = '红光'
+        self.params['speed'] = 100
+        self.params['engraving_mode'] = '填充雕刻'
 
-class Label(gfx.WorldObject):
+class Label(Element):
     def __init__(self,text,font_size,family,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
-
+        
         self.text = text
         self.font_size = font_size
         self.family = family
@@ -296,9 +306,10 @@ class Label(gfx.WorldObject):
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
 
-class Bitmap(gfx.WorldObject):
-    def __init__(self,pixelsize,im = None):
-        super().__init__()
+class Bitmap(Element):
+    def __init__(self,pixelsize,im = None,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+
         if im is None:
             im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
 
@@ -391,7 +402,7 @@ class Engravtor(gfx.WorldObject):
         
         if event.type == "pointer_down" and event.button == 3:
             for obj in self.target_area.children:
-                if type(obj) != Label and type(obj) != Bitmap:
+                if Element not in obj.__class__.__mro__:
                     continue
                 aabb = obj.get_geometry_bounding_box()
                 lb = np.array([aabb[0][0],aabb[0][1],0])
@@ -489,7 +500,7 @@ class Engravtor(gfx.WorldObject):
     def get_items(self):
         items = []
         for obj in self.target_area.children:
-            if type(obj) != Label and type(obj) != Bitmap:
+            if Element not in obj.__class__.__mro__:
                 continue
             items.append(obj)
         return items
