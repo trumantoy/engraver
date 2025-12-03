@@ -161,7 +161,7 @@ class Hotbar (Gtk.ScrolledWindow):
                 if text == '图片':
                     self.image_add(obj_make)
                 else:
-                    obj_make()
+                    self.emit('item-added',obj_make())
 
             button = Gtk.Button()
             button.connect('clicked',callback, text, action)
@@ -195,9 +195,9 @@ class Hotbar (Gtk.ScrolledWindow):
             else:
                 im = Image.open(file_path)
                 image_array = np.array(im)
-                obj_make(image_array)
+                self.emit('item-added',obj_make(image_array))
 
-        dialog.open(None, None, open_file) 
+        dialog.open(None, None, open_file)
 
 
 @Gtk.Template(filename='ui/propbar.ui')

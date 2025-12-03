@@ -24,6 +24,10 @@ class Panel (Gtk.Box):
     spin_power = Gtk.Template.Child('power')
     spin_speed = Gtk.Template.Child('speed')
     swt_excutable = Gtk.Template.Child('excutable')
+    
+    box_present = Gtk.Template.Child('box_present')
+    box_process = Gtk.Template.Child('box_process')
+    box_start = Gtk.Template.Child('box_start')
 
     # listview = Gtk.Template.Child('geoms')
     # expander_device = Gtk.Template.Child('expander_device')
@@ -70,6 +74,10 @@ class Panel (Gtk.Box):
         # right_click_gesture.set_button(3)  # 3 代表鼠标右键
         # right_click_gesture.connect("pressed", self.listview_right_clicked)
         # self.listview.add_controller(right_click_gesture)
+
+
+
+        self.items = None
 
     @Gtk.Template.Callback()
     def device_manager_clicked(self, btn):
@@ -123,6 +131,7 @@ class Panel (Gtk.Box):
         self.swt_excutable.set_active(obj.params['excutable'])
     
     def set_params(self,items):
+        self.items = items
         self.lstbox_params.remove_all()
 
         for item in items:
@@ -215,6 +224,67 @@ class Panel (Gtk.Box):
             box.append(box_1)
             self.lstbox_params.append(box)
 
+    @GObject.Signal(return_type=bool, arg_types=(object,))
+    def presented(self,*args): pass
+
+    @Gtk.Template.Callback()
+    def btn_present_toggled(self,sender):
+        if sender.get_active():
+            sender.set_label('停止')
+
+
+            if self.obj:
+                lb,rb,rt,lt = self.obj.get_oriented_bounding_box()
+                gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+                gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} F100 S4\n'
+                gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+                gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+            else:
+                for item in self.items:
+                    lb,rb,rt,lt = item.get_oriented_bounding_box()
+                    gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+                    gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} F100 S4\n'
+                    gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+                    gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+
+            def present():
+                self.emit('presented', gcode)
+                return sender.get_active()
+            GLib.timeout_add(100, present)
+        else:
+            sender.set_label('走边框')
+
+
+        # for item in self.items:
+        #     lb,rb,rt,lt = item.get_oriented_bounding_box()
+        #     gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+        #     gcode += f'M3'
+        #     gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} E100 S4\n'
+        #     gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+        #     gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+        #     gcode += f'M5'
+        #     GLib.timeout_add(1000, self.emit, 'presented', gcode)
+
+    @Gtk.Template.Callback()
+    def btn_process_clicked(self,sender):
+        self.stack.set_visible_child_name('预览')
+        self.box_start.set_visible(True)
+        self.box_present.set_visible(False)
+        self.box_process.set_visible(False)
+        pass
+
+    @Gtk.Template.Callback()
+    def btn_back_clicked(self,sender):
+        self.stack.set_visible_child_name('总览')
+        self.box_start.set_visible(False)
+        self.box_present.set_visible(True)
+        self.box_process.set_visible(True)
+        pass
+
+    @Gtk.Template.Callback()
+    def btn_start_clicked(self,sender):
+        pass
+    
         
 
     # def listview_selection_changed(self, model, *args):

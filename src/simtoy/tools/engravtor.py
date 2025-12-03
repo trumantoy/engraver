@@ -12,97 +12,6 @@ from importlib.resources import files
 import numpy as np
 from PIL import Image
 
-import serial
-
-class USBController:
-    def __init__(self):
-        """初始化Grbl控制器连接"""
-        self.serial = None
-        
-    def connect(self,port):
-        """连接到Grbl控制器"""
-        try:
-            # 初始化串口（根据实际设备修改参数）
-            self.serial = serial.Serial(port=port,baudrate=9600,timeout=1)
-
-            # 检查串口是否打开
-            if not self.serial.is_open:
-                self.serial = None
-                print("串口打开失败") 
-                return False
-            
-        except Exception as e:
-            self.serial = None
-            print(f"连接失败: {str(e)}")
-            return False
-
-        print(f"串口 {self.serial.name} 已打开")
-        return True
-    
-    def disconnect(self):
-        """断开与Grbl控制器的连接"""
-        if self.serial:
-            self.serial.close()
-            print("已断开与Grbl控制器的连接")
-
-
-    def set_axes_invert(self):
-        """设置轴 invert"""
-        req = f'$240P2P6P5\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-
-    def set_process_params(self):
-        """
-        T：参数识别 F:速度 S:功率 C:频率 D:占空比 E:开光延时
-        H:关光延时 U:跳转延时
-        单位F:mm/s S[0-100]% Cus Dus EHUms
-        1kHz占空比50%  C：1000 D：500
-        """
-
-        req = f'T0 C22\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-    
-    def excute(self, lines):
-        queue_size = self.get_queue_size()
-        print('queue_size',queue_size)   
-
-        for line in lines:
-            req = f'{line}\n'.encode()
-            self.serial.write(req)
-        
-        for _ in range(len(lines)):
-            self.serial.readline()
-    
-    def get_queue_size(self):
-        """获取Grbl接收缓存队列余量"""
-        req = '%\n'.encode()
-        print(req)
-        self.serial.write(req)
-        res = self.serial.readline()
-        print(res)
-        return int(res.decode().split(':')[1])
-    
-    def get_status(self):
-        """获取Grbl状态信息"""
-        if not self.connected:
-            print("未连接到控制器，请先连接")
-            return None
-            
-        try:
-            # 发送状态请求
-            self.serial.write(b'?')
-            response = self.serial.readline().decode('utf-8').strip()
-            return response
-        except Exception as e:
-            print(f"获取状态出错: {str(e)}")
-            return None
-
 
 class TranformHelper(gfx.WorldObject):
     def __init__(self, *args, **kwargs):
@@ -174,11 +83,10 @@ class TranformHelper(gfx.WorldObject):
             for obj in [self.rotation,self.scale,self.translation]:
                 obj : gfx.WorldObject
                 aabb = obj.get_geometry_bounding_box()
-
                 lb = np.array([aabb[0][0],aabb[0][1],0])
                 rb = np.array([aabb[1][0],aabb[0][1],0])
                 rt = np.array([aabb[1][0],aabb[1][1],0])
-                lt = np.array([aabb[0][0],aabb[1][1],0])
+                lt = np.array([aabb[0][0],aabb[1][1],0])    
                 lb = la.vec_transform(lb, obj.world.matrix, projection=False)
                 rb = la.vec_transform(rb, obj.world.matrix, projection=False)
                 rt = la.vec_transform(rt, obj.world.matrix, projection=False)
@@ -305,6 +213,18 @@ class Label(Element):
 
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
+    
+    def get_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.obj.world.matrix, projection=False)
+        rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
+        rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
+        lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        return (lb,rb,rt,lt)
 
 class Bitmap(Element):
     def __init__(self,pixelsize,im = None,*args,**kwargs):
@@ -326,12 +246,27 @@ class Bitmap(Element):
     
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
-
+    
+    def get_geometry_bounding_box(self):
+        return self.obj.get_geometry_bounding_box()
+    
+    def get_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.obj.world.matrix, projection=False)
+        rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
+        rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
+        lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        return (lb,rb,rt,lt)
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.steps = list()
+
         self.init_params()
 
         path = files("simtoy.data.engravtor") / "engravtor.gltf"
@@ -342,6 +277,7 @@ class Engravtor(gfx.WorldObject):
         self.add(tool)
 
         self.target_area : gfx.WorldObject = next(tool.iter(lambda o: o.name == '工作区-内'))
+        self.target_area.material.pick_write = True
         self.laser_aperture : gfx.WorldObject = next(tool.iter(lambda o: o.name == '激光'))
 
         camera : gfx.PerspectiveCamera = next(tool.iter(lambda o: o.name == '摄像头'))
@@ -351,18 +287,12 @@ class Engravtor(gfx.WorldObject):
         persp_camera : gfx.PerspectiveCamera = next(tool.iter(lambda o: o.name == '观察点'))
         persp_camera.show_pos(self.target_area.world.position,up=[0,0,1],depth=1.0)
         self.persp_camera = persp_camera
-
-        # ortho_camera : gfx.OrthographicCamera = next(gltf.scene.iter(lambda o: o.name == '正交相机'))
-        # ortho_camera.show_pos(target.world.position,up=[0,0,1])
         
-        # self.controller = gfx.OrbitController()
-        # self.controller.add_camera(persp_camera)
-        # self.controller.add_camera(ortho_camera)
-        
-        geom = gfx.sphere_geometry(radius=0.0001)
-        material = gfx.MeshBasicMaterial(color=(1, 0, 0, 1),flat_shading=True)
-        self.focus = gfx.Mesh(geom,material)
+        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize * 2/1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
         self.target_area.add(self.focus)
+
+        self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize/1000,thickness_space='world',color=(1, 0, 0, 0)))
+        self.target_area.add(self.laser)
 
         self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
         self.transform_helper = None
@@ -404,16 +334,8 @@ class Engravtor(gfx.WorldObject):
             for obj in self.target_area.children:
                 if Element not in obj.__class__.__mro__:
                     continue
-                aabb = obj.get_geometry_bounding_box()
-                lb = np.array([aabb[0][0],aabb[0][1],0])
-                rb = np.array([aabb[1][0],aabb[0][1],0])
-                rt = np.array([aabb[1][0],aabb[1][1],0])
-                lt = np.array([aabb[0][0],aabb[1][1],0])    
-                lb = la.vec_transform(lb, obj.world.matrix, projection=False)
-                rb = la.vec_transform(rb, obj.world.matrix, projection=False)
-                rt = la.vec_transform(rt, obj.world.matrix, projection=False)
-                lt = la.vec_transform(lt, obj.world.matrix, projection=False)
-
+                lb,rb,rt,lt = obj.get_oriented_bounding_box()
+                
                 a = np.cross(rb - lb,world_pos - lb)
                 a = a / np.linalg.norm(a)
                 b = np.cross(rt - rb,world_pos - rb)
@@ -443,7 +365,7 @@ class Engravtor(gfx.WorldObject):
     
     def step(self,dt):
         if self.steps:
-            self.steps[0]()
+            self.steps[0](dt)
             self.steps.pop(0)
 
         aabb = self.target.get_geometry_bounding_box()
@@ -454,6 +376,9 @@ class Engravtor(gfx.WorldObject):
         self.light_spot_size = 0.0000075
         self.pixelsize = 0.1
         self.paths = list()
+        self.speed = 100
+        self.power = 0
+        self.pos = (0,0,0)
 
     def get_view_focus(self):
         return self.camera.local.position,self.target_area.local.position
@@ -504,7 +429,7 @@ class Engravtor(gfx.WorldObject):
                 continue
             items.append(obj)
         return items
-
+    
     def export_svg(self,file_name):
         import cairo
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
@@ -557,78 +482,77 @@ class Engravtor(gfx.WorldObject):
         return width,height
     
     def excute(self,line : str):
-        commands = line.split(' ')
-        for cmd in commands:
-            if cmd == 'G0':
-                self.laser = None
-                self.line = None
-                self.cutting = False
-                self.focus.local.y = self.focus.local.x = 0
-            elif cmd == 'M3':
-                pos = (self.focus.local.x,self.focus.local.y,0)
-                self.line = gfx.Line(gfx.Geometry(positions=[pos]),gfx.LineMaterial(thickness=self.light_spot_size,thickness_space='world',color='red'))
-
-                origin = self.laser_aperture.local.position[:]
-                direction = self.focus.local.position[:]
-                self.laser = gfx.Line(gfx.Geometry(positions=[origin,direction]),gfx.LineMaterial(thickness=self.light_spot_size,thickness_space='world',color='red'))
-                self.target_area.add(self.laser)
-            elif cmd == 'G1':
-                self.cutting = True
-            elif cmd == 'M5':
-                self.line = None
-                self.cutting = False
-
-                if hasattr(self,'laser') and self.laser:
-                    self.target_area.remove(self.laser)
-                    self.laser = None
-            elif cmd.startswith('X'):
-                self.focus.local.x = float(cmd[1:]) / 1000
-            elif cmd.startswith('Y'):
-                self.focus.local.y = float(cmd[1:]) / 1000
-            else:
-                pass
-        
-        if not self.cutting: return 
-        pos = (self.focus.local.x,self.focus.local.y,0)
-        geometry = gfx.Geometry(positions=np.concatenate([self.line.geometry.positions.data,[pos]],dtype=np.float32))
-        self.line.geometry = geometry
-
-        origin = self.laser_aperture.local.position[:]
-        direction = self.focus.local.position[:]
-        self.laser.geometry = gfx.Geometry(positions=[origin,direction])
-
-        if self.line.geometry.positions.data.shape[0] == 2:
-            aabb = self.target.get_geometry_bounding_box()
-            self.line.local.z = (aabb[1][2] - aabb[0][2]) / 2
-            self.target.add(self.line)
-
-    def preview(self,gcode):
-        self.gcode = gcode.splitlines()
-
-        def fun(i):
-            if i == len(self.gcode): return
+        lines = line.split('\n')
+        for line in lines:
+            if not line or line.startswith(';'): continue
+            print(line)
+            moveable = False
+            x = None
+            y = None
+            power = self.power
+            speed = self.speed
             
-            while True:
-                line = self.gcode[i].strip()
-                if line and not line.startswith(';'): break
-                i+=1
+            command = line.split(' ')
+            for param in command:
+                if param == 'G0':
+                    self.laser = None
+                    self.line = None
+                    self.cutting = False
+                    moveable = True
+                    x = 0,y = 0
+                    power = 0
+                elif param == 'M3':
+                    power = self.power
+                elif param == 'G1': 
+                    moveable = True
+                elif param == 'M5':
+                    power = 0
+                elif param.startswith('X'):
+                    x = float(param[1:]) / 1000
+                    moveable = True
+                elif param.startswith('Y'):
+                    y = float(param[1:]) / 1000
+                    moveable = True
+                elif param.startswith('F'):
+                    speed = float(param[1:])
+                elif param.startswith('S'):
+                    power = float(param[1:])
+                else:
+                    pass
+                
+            if moveable:
+                self.move(x,y,speed,power)
 
-            self.excute(line)
-            self.steps.append(lambda: fun(i+1))
-        self.steps.append(lambda: fun(0))
+            # self.pos = (self.focus.local.x,self.focus.local.y,0)
+            # geometry = gfx.Geometry(positions=np.concatenate([self.line.geometry.positions.data,[pos]],dtype=np.float32))
+            # self.line.geometry = geometry
 
-    def run(self,gcode):
-        self.controller.set_axes_invert()
-        self.controller.set_process_params()
-        self.gcode = gcode.splitlines()
-        self.gcode = [line.strip() for line in self.gcode if line and not line.startswith(';')]
+            # origin = self.laser_aperture.local.position[:]
+            # direction = self.focus.local.position[:]
+            # self.laser.geometry = gfx.Geometry(positions=[origin,direction])
 
-        def fun(i):
-            if i == len(self.gcode): return
+            # if self.line.geometry.positions.data.shape[0] == 2:
+            #     aabb = self.target.get_geometry_bounding_box()
+            #     self.line.local.z = (aabb[1][2] - aabb[0][2]) / 2
+            #     self.target.add(self.line)
 
-            lines = self.gcode[i:i+100]
-            self.controller.excute(lines)
+    def move(self,x,y,speed,power):
+        start = self.focus.local.position[:2]
+        end = np.array([x,y])
+        dir = end - start
+        dist = np.linalg.norm(dir) * 1000
+        dir /= np.linalg.norm(dir)
 
-            self.steps.append(lambda: fun(i+len(lines)))
-        self.steps.append(lambda: fun(0))
+        def f(dt):
+            n = dist / (self.speed * dt)
 
+
+            # self.focus.local.position = start + dir * dt * self.speed
+            # self.laser.geometry.positions.data[1] = self.focus.local.position
+
+
+
+
+            self.steps.insert(0,f)
+
+        self.steps.append(f)

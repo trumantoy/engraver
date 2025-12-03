@@ -93,10 +93,13 @@ class AppWindow (Gtk.ApplicationWindow):
         self.camera_controller = gfx.OrbitController()
         for c in self.tool.get_viewport(): self.camera_controller.add_camera(c)
         self.hotbar.set_items(self.tool.get_hot_items())
+        self.hotbar.connect('item-added', self.item_added)
 
         self.tool.selected_func = self.selected_func
         self.tool.transformed_func = self.transformed_func
         self.propbar.connect('item-removed', self.item_removed)
+
+        self.panel.connect('presented', self.presented)
 
         GLib.timeout_add(1000/180,lambda: self.editor.step() or True)
 
@@ -138,16 +141,23 @@ class AppWindow (Gtk.ApplicationWindow):
         self.propbar.set_visible(obj)
         self.propbar.set_obj(obj)
         self.panel.set_obj(obj)
-        self.panel.set_params(self.tool.get_items())
 
     def transformed_func(self,obj):
         self.propbar.set_obj(obj)
+
+    def item_added(self,sender,obj):
+        self.panel.set_params(self.tool.get_items())
 
     def item_removed(self,sender,obj):
         self.tool.target_area.remove(self.tool.transform_helper)
         self.tool.transform_helper = None
         self.tool.target_area.remove(obj)
         self.propbar.set_visible(False)
+        self.panel.set_obj(None)
+        self.panel.set_params(self.tool.get_items())
+
+    def presented(self,sender,gcode):
+        self.tool.excute(gcode)
 
     def file_import(self, sender, args):
         dialog = Gtk.FileDialog()
