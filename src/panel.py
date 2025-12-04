@@ -78,6 +78,7 @@ class Panel (Gtk.Box):
 
 
         self.items = None
+        self.obj = None
 
     @Gtk.Template.Callback()
     def device_manager_clicked(self, btn):
@@ -227,43 +228,34 @@ class Panel (Gtk.Box):
     @GObject.Signal(return_type=bool, arg_types=(object,))
     def presented(self,*args): pass
 
+    @GObject.Signal(return_type=bool, arg_types=(object,))
+    def rested(self,*args): pass
+
     @Gtk.Template.Callback()
     def btn_present_toggled(self,sender):
         if sender.get_active():
             sender.set_label('停止')
 
-
             if self.obj:
                 lb,rb,rt,lt = self.obj.get_oriented_bounding_box()
-                gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
-                gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} F100 S4\n'
-                gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
-                gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+                gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
+                gcode += f'G0 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f}\n'
+                gcode += f'G0 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+                gcode += f'G0 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
             else:
                 for item in self.items:
                     lb,rb,rt,lt = item.get_oriented_bounding_box()
-                    gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
-                    gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} F100 S4\n'
-                    gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
-                    gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
-
+                    gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
+                    gcode += f'G0 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f}\n'
+                    gcode += f'G0 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+                    gcode += f'G0 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
             def present():
                 self.emit('presented', gcode)
-                return sender.get_active()
-            GLib.timeout_add(100, present)
+                return self.get_mapped() and sender.get_active()
+            GLib.idle_add(present)
         else:
             sender.set_label('走边框')
-
-
-        # for item in self.items:
-        #     lb,rb,rt,lt = item.get_oriented_bounding_box()
-        #     gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
-        #     gcode += f'M3'
-        #     gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} E100 S4\n'
-        #     gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
-        #     gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
-        #     gcode += f'M5'
-        #     GLib.timeout_add(1000, self.emit, 'presented', gcode)
+            self.emit('rested',None)
 
     @Gtk.Template.Callback()
     def btn_process_clicked(self,sender):

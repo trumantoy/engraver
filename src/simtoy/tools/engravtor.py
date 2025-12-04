@@ -214,7 +214,7 @@ class Label(Element):
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
     
-    def get_oriented_bounding_box(self):
+    def get_world_oriented_bounding_box(self):
         aabb = self.obj.get_geometry_bounding_box()
         lb = np.array([aabb[0][0],aabb[0][1],0])
         rb = np.array([aabb[1][0],aabb[0][1],0])
@@ -224,6 +224,18 @@ class Label(Element):
         rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
         rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
         lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        return (lb,rb,rt,lt)
+    
+    def get_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.obj.local.matrix, projection=False)
+        rb = la.vec_transform(rb, self.obj.local.matrix, projection=False)
+        rt = la.vec_transform(rt, self.obj.local.matrix, projection=False)
+        lt = la.vec_transform(lt, self.obj.local.matrix, projection=False)
         return (lb,rb,rt,lt)
 
 class Bitmap(Element):
@@ -250,7 +262,7 @@ class Bitmap(Element):
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
     
-    def get_oriented_bounding_box(self):
+    def get_world_oriented_bounding_box(self):
         aabb = self.obj.get_geometry_bounding_box()
         lb = np.array([aabb[0][0],aabb[0][1],0])
         rb = np.array([aabb[1][0],aabb[0][1],0])
@@ -260,6 +272,18 @@ class Bitmap(Element):
         rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
         rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
         lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        return (lb,rb,rt,lt)
+    
+    def get_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.obj.local.matrix, projection=False)
+        rb = la.vec_transform(rb, self.obj.local.matrix, projection=False)
+        rt = la.vec_transform(rt, self.obj.local.matrix, projection=False)
+        lt = la.vec_transform(lt, self.obj.local.matrix, projection=False)
         return (lb,rb,rt,lt)
 
 class Engravtor(gfx.WorldObject):
@@ -334,7 +358,7 @@ class Engravtor(gfx.WorldObject):
             for obj in self.target_area.children:
                 if Element not in obj.__class__.__mro__:
                     continue
-                lb,rb,rt,lt = obj.get_oriented_bounding_box()
+                lb,rb,rt,lt = obj.get_world_oriented_bounding_box()
                 
                 a = np.cross(rb - lb,world_pos - lb)
                 a = a / np.linalg.norm(a)
@@ -365,8 +389,8 @@ class Engravtor(gfx.WorldObject):
     
     def step(self,dt):
         if self.steps:
-            self.steps[0](dt)
-            self.steps.pop(0)
+            f = self.steps.pop(0)
+            f(dt)
 
         aabb = self.target.get_geometry_bounding_box()
         self.focus.local.z = aabb[1][2] - aabb[0][2]
@@ -485,22 +509,18 @@ class Engravtor(gfx.WorldObject):
         lines = line.split('\n')
         for line in lines:
             if not line or line.startswith(';'): continue
-            print(line)
             moveable = False
             x = None
             y = None
             power = self.power
             speed = self.speed
-            
+            print(line)
             command = line.split(' ')
             for param in command:
                 if param == 'G0':
-                    self.laser = None
-                    self.line = None
-                    self.cutting = False
                     moveable = True
-                    x = 0,y = 0
-                    power = 0
+                    x = 0
+                    y = 0
                 elif param == 'M3':
                     power = self.power
                 elif param == 'G1': 
@@ -508,10 +528,10 @@ class Engravtor(gfx.WorldObject):
                 elif param == 'M5':
                     power = 0
                 elif param.startswith('X'):
-                    x = float(param[1:]) / 1000
+                    x = float(param[1:])
                     moveable = True
                 elif param.startswith('Y'):
-                    y = float(param[1:]) / 1000
+                    y = float(param[1:])
                     moveable = True
                 elif param.startswith('F'):
                     speed = float(param[1:])
@@ -521,38 +541,72 @@ class Engravtor(gfx.WorldObject):
                     pass
                 
             if moveable:
-                self.move(x,y,speed,power)
+                def make_f(*args):
+                    return lambda dt: self.move(dt,*args)
+                self.steps.append(make_f(x,y,speed))
 
-            # self.pos = (self.focus.local.x,self.focus.local.y,0)
-            # geometry = gfx.Geometry(positions=np.concatenate([self.line.geometry.positions.data,[pos]],dtype=np.float32))
-            # self.line.geometry = geometry
+                self.laser.material.color = (1,0,0,power / 100)
+                self.laser.geometry.update()
 
-            # origin = self.laser_aperture.local.position[:]
-            # direction = self.focus.local.position[:]
-            # self.laser.geometry = gfx.Geometry(positions=[origin,direction])
+            self.power = power
+            self.speed = speed
 
-            # if self.line.geometry.positions.data.shape[0] == 2:
-            #     aabb = self.target.get_geometry_bounding_box()
-            #     self.line.local.z = (aabb[1][2] - aabb[0][2]) / 2
-            #     self.target.add(self.line)
-
-    def move(self,x,y,speed,power):
-        start = self.focus.local.position[:2]
+    def move(self,dt,x,y,speed):
+        start = self.focus.local.position[:2] * 1000
         end = np.array([x,y])
         dir = end - start
-        dist = np.linalg.norm(dir) * 1000
-        dir /= np.linalg.norm(dir)
+        S = np.linalg.norm(dir)
+        dir /= S
 
-        def f(dt):
-            n = dist / (self.speed * dt)
+        v_max=100; v0=0; v1=0; a=100
 
+        # 加速阶段：从v0到v_max
+        t1 = (v_max - v0) / a  # 加速时间
+        s1 = v0 * t1 + 0.5 * a * t1**2  # 加速距离
+            
+        # 减速阶段：从v_max到v1
+        t3 = (v_max - v1) / a  # 减速时间
+        s3 = v_max * t3 - 0.5 * a * t3**2  # 减速距离
 
-            # self.focus.local.position = start + dir * dt * self.speed
-            # self.laser.geometry.positions.data[1] = self.focus.local.position
+        # 匀速阶段：总距离 - 加速距离 - 减速距离
+        s2 = S - s1 - s3
 
+        if s2 < 0:
+            total_v_sq = a * S
+            v_peak = np.sqrt(total_v_sq)  # 三角加速的速度峰值
+            t1 = v_peak / a  # 加速时间 = 减速时间
+            t3 = t1
+            s1 = 0.5 * a * t1**2
+            s3 = s1
+            s2 = 0  # 无匀速阶段
+            v_max = v_peak  # 更新实际峰值速度
+        
+        t2 = s2 / v_max if v_max != 0 else 0  # 匀速时间
+        total_time = t1 + t2 + t3  # 总运动时间
 
+        t = np.linspace(0, total_time, round(total_time / dt))
 
+        delta_move = []
 
-            self.steps.insert(0,f)
+        for ti in t:
+            if ti <= t1:
+                s = v0 * ti + 0.5 * a * ti**2
+            elif ti <= t1 + t2:
+                s = s1 + v_max * (ti - t1)
+            else:
+                delta_t = ti - (t1 + t2)
+                s = s1 + s2 + v_max * delta_t - 0.5 * a * delta_t**2
 
-        self.steps.append(f)
+            xy = start + dir * s
+
+            def make_f(x,y):
+                def f(dt):
+                    self.focus.local.x = x
+                    self.focus.local.y = y
+                    self.laser.geometry.positions.data[1] = self.focus.local.position
+                    self.laser.geometry.positions.update_full()
+                return f
+                
+            delta_move.append(make_f(xy[0]/1000,xy[1]/1000))
+        self.steps[0:0] = delta_move
+        

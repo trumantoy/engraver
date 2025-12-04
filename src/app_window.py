@@ -98,10 +98,10 @@ class AppWindow (Gtk.ApplicationWindow):
         self.tool.selected_func = self.selected_func
         self.tool.transformed_func = self.transformed_func
         self.propbar.connect('item-removed', self.item_removed)
-
         self.panel.connect('presented', self.presented)
+        self.panel.connect('rested', self.rested)
 
-        GLib.timeout_add(1000/180,lambda: self.editor.step() or True)
+        GLib.timeout_add(1000/180,lambda: self.editor.step(1/10) or True)
 
     def do_size_allocate(self, width: int, height: int, baseline: int):
         if hasattr(self,'prev_width'): 
@@ -157,7 +157,11 @@ class AppWindow (Gtk.ApplicationWindow):
         self.panel.set_params(self.tool.get_items())
 
     def presented(self,sender,gcode):
+        if 1 < len(self.tool.steps): return
         self.tool.excute(gcode)
+    
+    def rested(self,sender,*args):
+        self.tool.excute('G0\n')
 
     def file_import(self, sender, args):
         dialog = Gtk.FileDialog()
