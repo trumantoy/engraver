@@ -16,25 +16,16 @@ from simtoy import *
 class DeviceManagerDialog (Gtk.Window):
     __gtype_name__ = "DeviceManagerDialog"
 
+    lsv_devices = Gtk.Template.Child("devices")
     btn_add = Gtk.Template.Child("add")
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-        # model = Gtk.StringList.new(['a','b','c'])
-        # selection_model = Gtk.SingleSelection.new(model)
-        # selection_model.set_autoselect(True)
-        # selection_model.set_can_unselect(False)
-        
-        # factory = Gtk.SignalListItemFactory()
-        # factory.connect("setup", self.setup_listitem)
-        # factory.connect("bind", self.bind_listitem)
-
-        # self.lsv_usb_list.set_model(selection_model)
-        # self.lsv_usb_list.set_factory(factory)
-        # self.btn_usb_refresh.emit('clicked')
-        
-        # self.result = None
+        super().__init__(*args, **kwargs)       
+        factory = Gtk.SignalListItemFactory()
+        factory.connect("setup", self.setup_listitem)
+        factory.connect("bind", self.bind_listitem)
+        self.lsv_devices.set_factory(factory)        
+        self.result = None
         
     def setup_listitem(self, factory, listitem):
         label = Gtk.Label()
@@ -42,17 +33,19 @@ class DeviceManagerDialog (Gtk.Window):
 
     def bind_listitem(self, factory, listitem):
         label = listitem.get_child()
-        label.set_text(listitem.get_item().get_string())
+        device = listitem.get_item()
+        label.set_text(device.controller.name)
 
     @Gtk.Template.Callback()
     def btn_add_clicked(self, sender):
         from device_discovery import DeviceDiscoveryDialog
         dlg = DeviceDiscoveryDialog()
         dlg.set_modal(True)
-        dlg.set_transient_for(self.get_root())
         dlg.connect('close-request', self.device_discovery_closed)
         dlg.present()
 
     def device_discovery_closed(self, dlg):
-        print(dlg.result)
-        
+        return
+    
+    def add_device(self, device):
+        self.lsv_devices.get_model().append(device)

@@ -39,14 +39,14 @@
               </object>
             </child>
             <child>
-              <object class="GtkListView" id="lsv_devices">
+              <object class="GtkListView" id="devices">
                 <property name="hexpand">true</property>
                 <property name="vexpand">true</property>
               </object>
             </child>
           </object>
         </child>
-
+<!-- 
         <child>
           <object class="GtkBox">
             <property name="orientation">vertical</property>
@@ -58,13 +58,13 @@
               </object>
             </child>
             <child>
-              <object class="GtkListView">
+              <object class="GtkListView" id="available_devices">
                 <property name="hexpand">true</property>
                 <property name="vexpand">true</property>
               </object>
             </child>
           </object>
-        </child>
+        </child> -->
 
 
         <child>

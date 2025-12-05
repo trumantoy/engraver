@@ -86,7 +86,7 @@ class AppWindow (Gtk.ApplicationWindow):
         self.light = gfx.PointLight(intensity=1)
         self.editor.add(self.light)
 
-        self.tool = Engravtor(name='M3-00-355紫外打标机')
+        self.tool = Engravtor(name='M3-00-355')
         self.tool.set_consumable('木板-100x100x1')
         self.editor.add(self.tool)
         
@@ -100,6 +100,8 @@ class AppWindow (Gtk.ApplicationWindow):
         self.propbar.connect('item-removed', self.item_removed)
         self.panel.connect('presented', self.presented)
         self.panel.connect('rested', self.rested)
+        self.panel.add_device(self.tool)
+        self.panel.add_device(self.tool)
 
         GLib.timeout_add(1000/180,lambda: self.editor.step(1/10) or True)
 

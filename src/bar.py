@@ -219,8 +219,7 @@ class Propbar (Gtk.ScrolledWindow):
         Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
     @GObject.Signal(return_type=bool, arg_types=(object,))
-    def item_removed(self,*args): 
-        pass
+    def item_removed(self,*args): pass
 
     @Gtk.Template.Callback()
     def btn_remove_clicked(self,button):

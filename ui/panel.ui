@@ -39,13 +39,13 @@
                             <object class="GtkBox">
                                 <property name="spacing">5</property>
                                 <child>
-                                    <object class="GtkImage">
+                                    <object class="GtkImage" id="img_status">
                                         <style><class name="green-dot"></class></style>
                                     </object>
                                 </child>
 
                                 <child>
-                                    <object class="GtkLabel">
+                                    <object class="GtkLabel" id="lbl_status">
                                         <property name="label">&lt;small&gt;已连接&lt;/small&gt;</property>
                                         <property name="use-markup">True</property>
                                     </object>

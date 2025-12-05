@@ -220,10 +220,10 @@ class Label(Element):
         rb = np.array([aabb[1][0],aabb[0][1],0])
         rt = np.array([aabb[1][0],aabb[1][1],0])
         lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.obj.world.matrix, projection=False)
-        rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
-        rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
-        lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        lb = la.vec_transform(lb, self.world.matrix, projection=False)
+        rb = la.vec_transform(rb, self.world.matrix, projection=False)
+        rt = la.vec_transform(rt, self.world.matrix, projection=False)
+        lt = la.vec_transform(lt, self.world.matrix, projection=False)
         return (lb,rb,rt,lt)
     
     def get_oriented_bounding_box(self):
@@ -232,10 +232,10 @@ class Label(Element):
         rb = np.array([aabb[1][0],aabb[0][1],0])
         rt = np.array([aabb[1][0],aabb[1][1],0])
         lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.obj.local.matrix, projection=False)
-        rb = la.vec_transform(rb, self.obj.local.matrix, projection=False)
-        rt = la.vec_transform(rt, self.obj.local.matrix, projection=False)
-        lt = la.vec_transform(lt, self.obj.local.matrix, projection=False)
+        lb = la.vec_transform(lb, self.local.matrix, projection=False)
+        rb = la.vec_transform(rb, self.local.matrix, projection=False)
+        rt = la.vec_transform(rt, self.local.matrix, projection=False)
+        lt = la.vec_transform(lt, self.local.matrix, projection=False)
         return (lb,rb,rt,lt)
 
 class Bitmap(Element):
@@ -268,10 +268,10 @@ class Bitmap(Element):
         rb = np.array([aabb[1][0],aabb[0][1],0])
         rt = np.array([aabb[1][0],aabb[1][1],0])
         lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.obj.world.matrix, projection=False)
-        rb = la.vec_transform(rb, self.obj.world.matrix, projection=False)
-        rt = la.vec_transform(rt, self.obj.world.matrix, projection=False)
-        lt = la.vec_transform(lt, self.obj.world.matrix, projection=False)
+        lb = la.vec_transform(lb, self.world.matrix, projection=False)
+        rb = la.vec_transform(rb, self.world.matrix, projection=False)
+        rt = la.vec_transform(rt, self.world.matrix, projection=False)
+        lt = la.vec_transform(lt, self.world.matrix, projection=False)
         return (lb,rb,rt,lt)
     
     def get_oriented_bounding_box(self):
@@ -279,11 +279,11 @@ class Bitmap(Element):
         lb = np.array([aabb[0][0],aabb[0][1],0])
         rb = np.array([aabb[1][0],aabb[0][1],0])
         rt = np.array([aabb[1][0],aabb[1][1],0])
-        lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.obj.local.matrix, projection=False)
-        rb = la.vec_transform(rb, self.obj.local.matrix, projection=False)
-        rt = la.vec_transform(rt, self.obj.local.matrix, projection=False)
-        lt = la.vec_transform(lt, self.obj.local.matrix, projection=False)
+        lt = np.array([aabb[0][0],aabb[1][1],0])
+        lb = la.vec_transform(lb, self.local.matrix, projection=False)
+        rb = la.vec_transform(rb, self.local.matrix, projection=False)
+        rt = la.vec_transform(rt, self.local.matrix, projection=False)
+        lt = la.vec_transform(lt, self.local.matrix, projection=False)
         return (lb,rb,rt,lt)
 
 class Engravtor(gfx.WorldObject):
@@ -313,6 +313,7 @@ class Engravtor(gfx.WorldObject):
         self.persp_camera = persp_camera
         
         self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize * 2/1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
+        self.focus.render_order = 1
         self.target_area.add(self.focus)
 
         self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize/1000,thickness_space='world',color=(1, 0, 0, 0)))
@@ -610,3 +611,4 @@ class Engravtor(gfx.WorldObject):
             delta_move.append(make_f(xy[0]/1000,xy[1]/1000))
         self.steps[0:0] = delta_move
         
+    def is_connected(self): return True

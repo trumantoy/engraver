@@ -28,6 +28,8 @@ class Panel (Gtk.Box):
     box_present = Gtk.Template.Child('box_present')
     box_process = Gtk.Template.Child('box_process')
     box_start = Gtk.Template.Child('box_start')
+    img_status = Gtk.Template.Child('img_status')
+    lbl_status = Gtk.Template.Child('lbl_status')
 
     # listview = Gtk.Template.Child('geoms')
     # expander_device = Gtk.Template.Child('expander_device')
@@ -42,51 +44,34 @@ class Panel (Gtk.Box):
     # menu_add = Gtk.Template.Child('popover_menu_add')
     # menu = Gtk.Template.Child('popover_menu')
 
-
     def __init__(self):
         self.provider.load_from_path('ui/panel.css')
         Gtk.StyleContext.add_provider_for_display(self.get_display(),self.provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
-        # self.model = Gio.ListStore(item_type=GObject.Object)
-        # self.tree_model = Gtk.TreeListModel.new(self.model,passthrough=False,autoexpand=False,create_func=lambda item: item.model)
-
-        # self.selection_model = Gtk.SingleSelection.new(self.tree_model)
-        # self.selection_model.set_autoselect(True)
-        # self.selection_model.set_can_unselect(True)
-        # self.selection_model.connect('selection-changed', self.listview_selection_changed)
-        # self.cur_item_index = Gtk.INVALID_LIST_POSITION
+        model = Gio.ListStore(item_type=GObject.Object)
+        self.selection = Gtk.SingleSelection.new(model)
+        self.selection.set_autoselect(True)
+        self.selection.set_can_unselect(True)
+        GLib.timeout_add(1000, self.update_status)
         
-        # factory = Gtk.SignalListItemFactory()
-        # factory.connect("setup", self.setup_listitem)
-        # factory.connect("bind", self.bind_listitem)
-                
-        # self.listview.set_model(self.selection_model)
-        # self.listview.set_factory(factory)
-        
-        # # 创建右键点击手势
-        # left_click_gesture = Gtk.GestureClick()
-        # left_click_gesture.set_button(1)  # 3 代表鼠标右键
-        # left_click_gesture.connect("pressed", self.listview_left_clicked)
-        # self.listview.add_controller(left_click_gesture)
-
-        # 创建右键点击手势
-        # right_click_gesture = Gtk.GestureClick()
-        # right_click_gesture.set_button(3)  # 3 代表鼠标右键
-        # right_click_gesture.connect("pressed", self.listview_right_clicked)
-        # self.listview.add_controller(right_click_gesture)
-
-
-
         self.items = None
         self.obj = None
 
+    def update_status(self):
+        item = self.selection.get_selected_item()
+        if item.controller.is_connected():
+            # self.img_status.set_from_icon_name('emblem-ok-symbolic')
+            self.lbl_status.set_label('已连接')
+        else:
+            # self.img_status.set_from_icon_name('dialog-warning-symbolic')
+            self.lbl_status.set_label('未连接')
+        
     @Gtk.Template.Callback()
     def device_manager_clicked(self, btn):
-        print('device manager clicked')
         from device_manager import DeviceManagerDialog
         dlg = DeviceManagerDialog()
+        dlg.lsv_devices.set_model(self.selection)
         dlg.set_modal(True)
-        dlg.set_transient_for(self.get_root())
         dlg.present()
     
     @Gtk.Template.Callback()
@@ -94,14 +79,17 @@ class Panel (Gtk.Box):
         from device_discovery import DeviceDiscoveryDialog
         dlg = DeviceDiscoveryDialog()
         dlg.set_modal(True)
-        dlg.set_transient_for(self.get_root())
         dlg.connect('close-request', self.device_discovery_closed)
         dlg.present()
 
     def device_discovery_closed(self, dlg):
         if dlg.result:
             print(dlg.result)
-            
+
+    def add_device(self,controller):
+        device = GObject.Object()
+        device.controller = controller
+        self.selection.get_model().append(device)
 
     @Gtk.Template.Callback()
     def on_activate_cursor_row(self,listbox, row):
@@ -109,9 +97,9 @@ class Panel (Gtk.Box):
 
     def set_obj(self,obj):
         self.stack.set_visible_child_name('参数' if obj else '总览')
-        if not obj: return
-
         self.obj = obj
+
+        if not obj: return
         if obj.__class__.__name__ == 'Label':
             self.label_kind.set_label('文本')
             self.image_icon.set_from_icon_name('format-text-bold')
@@ -235,20 +223,17 @@ class Panel (Gtk.Box):
     def btn_present_toggled(self,sender):
         if sender.get_active():
             sender.set_label('停止')
-
-            if self.obj:
-                lb,rb,rt,lt = self.obj.get_oriented_bounding_box()
-                gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
+            gcode = ''
+            if self.obj: items = [self.obj]
+            else: items = self.items
+            for item in items:
+                lb,rb,rt,lt = item.get_oriented_bounding_box()
+                gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
                 gcode += f'G0 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f}\n'
                 gcode += f'G0 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
                 gcode += f'G0 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
-            else:
-                for item in self.items:
-                    lb,rb,rt,lt = item.get_oriented_bounding_box()
-                    gcode = f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
-                    gcode += f'G0 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f}\n'
-                    gcode += f'G0 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
-                    gcode += f'G0 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+                gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+
             def present():
                 self.emit('presented', gcode)
                 return self.get_mapped() and sender.get_active()
@@ -276,7 +261,6 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def btn_start_clicked(self,sender):
         pass
-    
         
 
     # def listview_selection_changed(self, model, *args):

@@ -1,6 +1,6 @@
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import GLib, Gtk, Gio
+from gi.repository import GLib, Gtk, Gio, GObject
 
 import subprocess as sp
 import numpy as np
@@ -16,11 +16,10 @@ from simtoy import *
 
 class USBController:
     def __init__(self):
-        """初始化Grbl控制器连接"""
         self.serial = None
+        self.name = ''
         
     def connect(self,port):
-        """连接到Grbl控制器"""
         try:
             # 初始化串口（根据实际设备修改参数）
             self.serial = serial.Serial(port=port,baudrate=9600,timeout=1)
@@ -28,50 +27,42 @@ class USBController:
             # 检查串口是否打开
             if not self.serial.is_open:
                 self.serial = None
-                print("串口打开失败") 
-                return False
-            
+                return False            
         except Exception as e:
             self.serial = None
-            print(f"连接失败: {str(e)}")
             return False
-
-        print(f"串口 {self.serial.name} 已打开")
-        return True
+        
+        return self.is_connected()
     
     def disconnect(self):
-        """断开与Grbl控制器的连接"""
         if self.serial:
             self.serial.close()
-            print("已断开与Grbl控制器的连接")
 
+    def is_connected(self):
+        if not self.serial: return False
+        self.serial.write('$I\n')
+        res = self.serial.readlines(2)
+        response = res.decode().strip()
+        
+        if '[MODEL:' in response:
+            model_start = response.find('[MODEL:') + len('[MODEL:')
+            model_end = response.find(']', model_start)
+            if model_start > 0 and model_end > model_start:
+                self.name = response[model_start:model_end]
+
+        return bool(self.name)
 
     def set_axes_invert(self):
-        """设置轴 invert"""
         req = f'$240P2P6P5\n'.encode()
-        print(req)
         self.serial.write(req)
         res = self.serial.readline()
-        print(res)
 
     def set_process_params(self):
-        """
-        T：参数识别 F:速度 S:功率 C:频率 D:占空比 E:开光延时
-        H:关光延时 U:跳转延时
-        单位F:mm/s S[0-100]% Cus Dus EHUms
-        1kHz占空比50%  C：1000 D：500
-        """
-
         req = f'T0 C22\n'.encode()
-        print(req)
         self.serial.write(req)
         res = self.serial.readline()
-        print(res)
     
     def excute(self, lines):
-        queue_size = self.get_queue_size()
-        print('queue_size',queue_size)   
-
         for line in lines:
             req = f'{line}\n'.encode()
             self.serial.write(req)
@@ -80,28 +71,10 @@ class USBController:
             self.serial.readline()
     
     def get_queue_size(self):
-        """获取Grbl接收缓存队列余量"""
         req = '%\n'.encode()
-        print(req)
         self.serial.write(req)
         res = self.serial.readline()
-        print(res)
         return int(res.decode().split(':')[1])
-    
-    def get_status(self):
-        """获取Grbl状态信息"""
-        if not self.connected:
-            print("未连接到控制器，请先连接")
-            return None
-            
-        try:
-            # 发送状态请求
-            self.serial.write(b'?')
-            response = self.serial.readline().decode('utf-8').strip()
-            return response
-        except Exception as e:
-            print(f"获取状态出错: {str(e)}")
-            return None
 
 @Gtk.Template(filename='ui/device_discovery.ui')
 class DeviceDiscoveryDialog (Gtk.Window):
@@ -114,16 +87,16 @@ class DeviceDiscoveryDialog (Gtk.Window):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-        model = Gtk.StringList.new(['a','b','c'])
-        selection_model = Gtk.SingleSelection.new(model)
-        selection_model.set_autoselect(True)
-        selection_model.set_can_unselect(False)
+        model = Gio.ListStore(item_type=GObject.Object)
+        self.selection = Gtk.SingleSelection.new(model)
+        self.selection.set_autoselect(True)
+        self.selection.set_can_unselect(True)
         
         factory = Gtk.SignalListItemFactory()
         factory.connect("setup", self.setup_listitem)
         factory.connect("bind", self.bind_listitem)
 
-        self.lsv_usb_list.set_model(selection_model)
+        self.lsv_usb_list.set_model(self.selection)
         self.lsv_usb_list.set_factory(factory)
         self.btn_usb_refresh.emit('clicked')
 
@@ -135,24 +108,25 @@ class DeviceDiscoveryDialog (Gtk.Window):
 
     def bind_listitem(self, factory, listitem):
         label = listitem.get_child()
-        label.set_text(listitem.get_item().get_string())
+        device = listitem.get_item()
+        label.set_text(device.controller.name)
 
     @Gtk.Template.Callback()
     def btn_usb_add_clicked(self, sender):
         model = self.lsv_usb_list.get_model()
         item = model.get_selected_item()
-        if item: 
-            self.result = item.get_string()
-            self.usb_controller.set_axes_invert()
-            self.usb_controller.set_process_params()
-        
+        if item: self.result = item
         self.close()
 
     @Gtk.Template.Callback()
     def btn_usb_refresh_clicked(self, sender):
         import serial.tools.list_ports
         ports = serial.tools.list_ports.comports()
-        devices = [port.device for port in ports]
-        model = Gtk.StringList.new(devices)
-        selection_model = self.lsv_usb_list.get_model()
-        selection_model.set_model(model)
+        for port in [port.device for port in ports]:
+            controller = USBController()
+            if not controller.connect(port): continue
+            controller.set_axes_invert()
+            controller.set_process_params()
+            device = GObject.Object()
+            device.controller = controller
+            self.selection.get_model().append(device)
