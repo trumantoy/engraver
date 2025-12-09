@@ -101,7 +101,6 @@ class AppWindow (Gtk.ApplicationWindow):
         self.panel.connect('presented', self.presented)
         self.panel.connect('rested', self.rested)
         self.panel.add_device(self.tool)
-        self.panel.add_device(self.tool)
 
         GLib.timeout_add(1000/180,lambda: self.editor.step(1/10) or True)
 
