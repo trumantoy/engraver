@@ -115,65 +115,6 @@
                                                 <property name="margin-end">10</property>
                                                 <property name="selection-mode">GTK_SELECTION_NONE</property>
                                                 <signal name="row-activated" handler="on_activate_cursor_row" swapped="no"/>
-                                                <!-- <child>
-                                                    <object class="GtkBox">
-                                                        <property name="height-request">80</property>
-                                                        <property name="spacing">5</property>
-                                                        <child>
-                                                            <object class="GtkImage">
-                                                                <property name="pixel-size">80</property>
-                                                                <property name="icon-name">format-text-bold-symbolic</property>
-                                                            </object>
-                                                        </child>
-
-                                                        <child>
-                                                            <object class="GtkBox">
-                                                                <property name="orientation">vertical</property>
-                                                                <property name="valign">center</property>
-                                                                <property name="hexpand">True</property>
-                                                                <property name="spacing">1</property>
-                                                                <child>
-                                                                    <object class="GtkLabel">
-                                                                        <property name="halign">start</property>
-                                                                        <property name="label">&lt;span size="large"&gt;线条雕刻&lt;/span&gt;</property>
-                                                                        <property name="use-markup">True</property>
-                                                                    </object>
-                                                                </child>
-                                                                <child>
-                                                                    <object class="GtkLabel">
-                                                                        <property name="label">&lt;span size="medium"&gt;蓝光&lt;/span&gt;</property>
-                                                                        <property name="use-markup">True</property>
-                                                                        <property name="halign">start</property>
-                                                                    </object>
-                                                                </child>
-                                                                <child>
-                                                                    <object class="GtkBox">
-                                                                        <property name="spacing">20</property>
-
-                                                                        <child>
-                                                                            <object class="GtkLabel">
-                                                                                <property name="label">&lt;span color="gray" size="medium"&gt;9%&lt;/span&gt;</property>
-                                                                                <property name="use-markup">True</property>
-                                                                                <property name="halign">start</property>
-                                                                            </object>
-                                                                        </child>
-
-                                                                        <child>
-                                                                            <object class="GtkLabel">
-                                                                                <property name="label">&lt;span color="gray" size="medium"&gt;20mm/s&lt;/span&gt;</property>
-                                                                                <property name="use-markup">True</property>
-                                                                                <property name="halign">start</property>
-                                                                                <property name="halign">end</property>
-                                                                            </object>
-                                                                        </child>
-
-                                                                    </object>
-                                                                </child>
-                                                            </object>
-                                                        </child>
-
-                                                    </object>
-                                                </child> -->
                                             </object>
                                         </child>
                                     </object>

@@ -157,6 +157,33 @@ class Element(gfx.WorldObject):
         self.params['speed'] = 100
         self.params['engraving_mode'] = '填充雕刻'
 
+    def get_geometry_bounding_box(self):
+        return self.obj.get_geometry_bounding_box()
+    
+    def get_world_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.world.matrix, projection=False)
+        rb = la.vec_transform(rb, self.world.matrix, projection=False)
+        rt = la.vec_transform(rt, self.world.matrix, projection=False)
+        lt = la.vec_transform(lt, self.world.matrix, projection=False)
+        return (lb,rb,rt,lt)
+    
+    def get_oriented_bounding_box(self):
+        aabb = self.obj.get_geometry_bounding_box()
+        lb = np.array([aabb[0][0],aabb[0][1],0])
+        rb = np.array([aabb[1][0],aabb[0][1],0])
+        rt = np.array([aabb[1][0],aabb[1][1],0])
+        lt = np.array([aabb[0][0],aabb[1][1],0])    
+        lb = la.vec_transform(lb, self.local.matrix, projection=False)
+        rb = la.vec_transform(rb, self.local.matrix, projection=False)
+        rt = la.vec_transform(rt, self.local.matrix, projection=False)
+        lt = la.vec_transform(lt, self.local.matrix, projection=False)
+        return (lb,rb,rt,lt)
+
 class Label(Element):
     def __init__(self,text,font_size,family,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
@@ -205,38 +232,11 @@ class Label(Element):
 
         tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
         tex_map = gfx.TextureMap(tex)
-        width = img_width * pixelsize / 1000
-        height = img_height * pixelsize / 1000
+        self.width = img_width * pixelsize / 1000
+        self.height = img_height * pixelsize / 1000
         
-        self.obj = obj = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
-        self.add(obj)
-
-    def get_geometry_bounding_box(self):
-        return self.obj.get_geometry_bounding_box()
-    
-    def get_world_oriented_bounding_box(self):
-        aabb = self.obj.get_geometry_bounding_box()
-        lb = np.array([aabb[0][0],aabb[0][1],0])
-        rb = np.array([aabb[1][0],aabb[0][1],0])
-        rt = np.array([aabb[1][0],aabb[1][1],0])
-        lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.world.matrix, projection=False)
-        rb = la.vec_transform(rb, self.world.matrix, projection=False)
-        rt = la.vec_transform(rt, self.world.matrix, projection=False)
-        lt = la.vec_transform(lt, self.world.matrix, projection=False)
-        return (lb,rb,rt,lt)
-    
-    def get_oriented_bounding_box(self):
-        aabb = self.obj.get_geometry_bounding_box()
-        lb = np.array([aabb[0][0],aabb[0][1],0])
-        rb = np.array([aabb[1][0],aabb[0][1],0])
-        rt = np.array([aabb[1][0],aabb[1][1],0])
-        lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.local.matrix, projection=False)
-        rb = la.vec_transform(rb, self.local.matrix, projection=False)
-        rt = la.vec_transform(rt, self.local.matrix, projection=False)
-        lt = la.vec_transform(lt, self.local.matrix, projection=False)
-        return (lb,rb,rt,lt)
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.add(self.obj)
 
 class Bitmap(Element):
     def __init__(self,pixelsize,im = None,*args,**kwargs):
@@ -245,46 +245,38 @@ class Bitmap(Element):
         if im is None:
             im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
 
-        height = im.shape[0] * pixelsize / 1000
-        width = im.shape[1] * pixelsize / 1000
+        self.height = im.shape[0] * pixelsize / 1000
+        self.width = im.shape[1] * pixelsize / 1000
         tex = gfx.Texture(im,dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = gfx.Mesh(gfx.plane_geometry(width,height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False)) 
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False)) 
         self.add(self.obj)
         self.im = im
 
     def get_image(self):
         return self.im.astype(np.uint8)
     
-    def get_geometry_bounding_box(self):
-        return self.obj.get_geometry_bounding_box()
-    
-    def get_geometry_bounding_box(self):
-        return self.obj.get_geometry_bounding_box()
-    
-    def get_world_oriented_bounding_box(self):
-        aabb = self.obj.get_geometry_bounding_box()
-        lb = np.array([aabb[0][0],aabb[0][1],0])
-        rb = np.array([aabb[1][0],aabb[0][1],0])
-        rt = np.array([aabb[1][0],aabb[1][1],0])
-        lt = np.array([aabb[0][0],aabb[1][1],0])    
-        lb = la.vec_transform(lb, self.world.matrix, projection=False)
-        rb = la.vec_transform(rb, self.world.matrix, projection=False)
-        rt = la.vec_transform(rt, self.world.matrix, projection=False)
-        lt = la.vec_transform(lt, self.world.matrix, projection=False)
-        return (lb,rb,rt,lt)
-    
-    def get_oriented_bounding_box(self):
-        aabb = self.obj.get_geometry_bounding_box()
-        lb = np.array([aabb[0][0],aabb[0][1],0])
-        rb = np.array([aabb[1][0],aabb[0][1],0])
-        rt = np.array([aabb[1][0],aabb[1][1],0])
-        lt = np.array([aabb[0][0],aabb[1][1],0])
-        lb = la.vec_transform(lb, self.local.matrix, projection=False)
-        rb = la.vec_transform(rb, self.local.matrix, projection=False)
-        rt = la.vec_transform(rt, self.local.matrix, projection=False)
-        lt = la.vec_transform(lt, self.local.matrix, projection=False)
-        return (lb,rb,rt,lt)
+class Vector(Element):
+    def __init__(self,lines,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+
+        points = np.concatenate(lines,axis=0)
+        min_x = points[:,0].min()
+        min_y = points[:,1].min()
+        max_x = points[:,0].max()
+        max_y = points[:,1].max()
+        self.width = (max_x - min_x)
+        self.height = (max_y - min_y)
+
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(color=(1, 1, 1, 0),depth_test=False,flat_shading=True))
+
+        for line in [np.array(line) for line in lines]:
+            line = line - [min_x + self.width/2,min_y + self.height/2,0]
+            line = line.astype(np.float32)
+            line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color='yellow',depth_test=False))
+            self.obj.add(line)
+
+        self.add(self.obj)
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -425,27 +417,6 @@ class Engravtor(gfx.WorldObject):
     
     def get_viewport(self):
         return [self.persp_camera]
-
-    def get_hot_items(self):
-        def label():
-            aabb = self.target.get_geometry_bounding_box()
-            target_height = (aabb[1][2] - aabb[0][2])
-            
-            element = Label('中国智造',72,'KaiTi',self.pixelsize,name='文本')
-            element.local.z = target_height
-            self.target_area.add(element)
-            return element 
-
-        def bitmap(im):
-            target = self.target
-            aabb = target.get_geometry_bounding_box()
-            target_height = (aabb[1][2] - aabb[0][2])
-            element = Bitmap(self.pixelsize,im)
-            element.local.z = target_height
-            self.target_area.add(element)
-            return element 
-
-        return [('文本',label,'format-text-bold'),('图片',bitmap,'image-x-generic-symbolic')]
     
     def get_items(self):
         items = []
@@ -454,7 +425,35 @@ class Engravtor(gfx.WorldObject):
                 continue
             items.append(obj)
         return items
-    
+
+    def add_label(self):
+        aabb = self.target.get_geometry_bounding_box()
+        target_height = (aabb[1][2] - aabb[0][2])
+        
+        element = Label('中国智造',72,'KaiTi',self.pixelsize,name='文本')
+        element.local.z = target_height
+        self.target_area.add(element)
+
+    def add_bitmap(self,im):
+        target = self.target
+        aabb = target.get_geometry_bounding_box()
+        target_height = (aabb[1][2] - aabb[0][2])
+        element = Bitmap(self.pixelsize,im,name='图片')
+        element.local.scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element.local.z = target_height
+        self.target_area.add(element)
+
+    def add_vectors(self,lines):
+        target = self.target
+        aabb = target.get_geometry_bounding_box()
+        target_height = (aabb[1][2] - aabb[0][2])
+        
+        element = Vector(lines,name='矢量')
+        element.local.scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element.local.z = target_height
+
+        self.target_area.add(element)
+
     def export_svg(self,file_name):
         import cairo
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)

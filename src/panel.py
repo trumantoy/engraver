@@ -53,7 +53,12 @@ class Panel (Gtk.Box):
         self.selection.set_autoselect(True)
         self.selection.set_can_unselect(True)
         GLib.timeout_add(1000, self.update_status)
-        
+
+        model = Gio.ListStore(item_type=GObject.Object)
+        self.param_selection = Gtk.SingleSelection.new(model)
+        self.param_selection.set_autoselect(True)
+        self.param_selection.set_can_unselect(True)
+
         self.items = None
         self.obj = None
 
@@ -108,6 +113,11 @@ class Panel (Gtk.Box):
                 self.btn_engraving_mode_outline.set_active(True)
             else:
                 self.btn_engraving_mode_full.set_active(True)
+        elif obj.__class__.__name__ == 'Vector':
+            self.label_kind.set_label('矢量图')
+            self.image_icon.set_from_icon_name('folder-publicshare-symbolic')
+            self.btn_engraving_mode_outline.set_sensitive(False)
+            self.btn_engraving_mode_full.set_active(True)
         else:
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')

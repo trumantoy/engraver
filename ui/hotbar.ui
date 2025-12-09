@@ -15,20 +15,30 @@
                 <property name="orientation">vertical</property>
                 <property name="spacing">5</property>
                 <child>
-                    <object class="GtkButton" id="point">
+                    <object class="GtkButton" id="label">
                         <property name="label">文本</property>
                         <property name="height-request">50</property>
                         <property name="width-request">50</property>
-                    </object>
+                        <property name="icon-name">format-text-bold</property>
+                        <signal name="clicked" handler="label_clicked" swapped="no"/>
+                 </object>
                 </child>
                 <child>
-                    <object class="GtkButton" id="line">
+                    <object class="GtkButton" id="bitmap">
                         <property name="label">位图</property>
+                        <property name="height-request">50</property>
+                        <property name="width-request">50</property>
+                        <property name="icon-name">image-x-generic-symbolic</property>
+                        <signal name="clicked" handler="bitmap_clicked" swapped="no"/>
                     </object>
                 </child>
                 <child>
-                    <object class="GtkButton" id="surface">
+                    <object class="GtkButton" id="vector">
                         <property name="label">矢量图</property>
+                        <property name="height-request">50</property>
+                        <property name="width-request">50</property>
+                        <property name="icon-name">folder-publicshare-symbolic</property>
+                        <signal name="clicked" handler="vector_clicked" swapped="no"/>
                     </object>
                 </child>
             </object>

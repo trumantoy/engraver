@@ -135,6 +135,9 @@ class Viewbar (Gtk.ScrolledWindow):
         else:
             button.set_label('透视')
 
+import ezdxf
+from simtoy.tools.engravtor import *
+
 @Gtk.Template(filename='ui/hotbar.ui')
 class Hotbar (Gtk.ScrolledWindow):
     __gtype_name__ = "Hotbar"
@@ -145,32 +148,19 @@ class Hotbar (Gtk.ScrolledWindow):
         provider.load_from_path('ui/hotbar.css')
         Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
+    def bind_owner(self,tool : Engravtor):
+        self.owner = tool
+
     @GObject.Signal(return_type=bool, arg_types=(object,))
-    def item_added(self,*args): 
-        pass
-        
-    def set_items(self,items):
-        widget = self.tools.get_first_child()
-        while widget:
-            next_widget = widget.get_next_sibling()
-            self.tools.remove(widget)
-            widget = next_widget
+    def item_added(self,*args): pass
 
-        for text,action,icon in items:
-            def callback(sender,text,obj_make):
-                if text == '图片':
-                    self.image_add(obj_make)
-                else:
-                    self.emit('item-added',obj_make())
+    @Gtk.Template.Callback()
+    def label_clicked(self,button):
+        self.owner.add_label()
+        self.emit('item-added',None)
 
-            button = Gtk.Button()
-            button.connect('clicked',callback, text, action)
-            button.set_label(text)
-            button.set_size_request(50,50)
-            if icon: button.set_icon_name(icon)
-            self.tools.append(button)
-    
-    def image_add(self,obj_make):
+    @Gtk.Template.Callback()
+    def bitmap_clicked(self,button):
         dialog = Gtk.FileDialog()
         dialog.set_modal(True)
 
@@ -195,10 +185,44 @@ class Hotbar (Gtk.ScrolledWindow):
             else:
                 im = Image.open(file_path)
                 image_array = np.array(im)
-                self.emit('item-added',obj_make(image_array))
+                self.owner.add_bitmap(image_array)                    
+                self.emit('item-added',None)
 
-        dialog.open(None, None, open_file)
+        dialog.open(None, None, open_file) 
 
+    @Gtk.Template.Callback()
+    def vector_clicked(self,button):
+        dialog = Gtk.FileDialog()
+        dialog.set_modal(True)
+
+        filter_text = Gtk.FileFilter()
+        filter_text.set_name("矢量文件")
+        filter_text.add_pattern("*.dxf")
+        
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(filter_text)
+        dialog.set_filters(filters)
+        dialog.set_default_filter(filter_text)
+
+        def open_file(dialog, result): 
+            file_path = None
+            try:
+                file = dialog.open_finish(result)
+                file_path = file.get_path()
+            except:
+                return
+            else:
+                doc = ezdxf.readfile("a.dxf")
+                msp = doc.modelspace()
+                lines = []
+                for polyline in msp.query("LWPOLYLINE"):
+                    points = [(p[0], p[1], 0) for p in polyline.get_points()]  # 仅取XY坐标
+                    lines.append(points)
+
+                self.owner.add_vectors(lines)
+                self.emit('item-added',None)
+
+        dialog.open(None, None, open_file)  
 
 @Gtk.Template(filename='ui/propbar.ui')
 class Propbar (Gtk.ScrolledWindow):

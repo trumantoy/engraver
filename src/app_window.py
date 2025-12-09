@@ -92,8 +92,8 @@ class AppWindow (Gtk.ApplicationWindow):
         
         self.camera_controller = gfx.OrbitController()
         for c in self.tool.get_viewport(): self.camera_controller.add_camera(c)
-        self.hotbar.set_items(self.tool.get_hot_items())
         self.hotbar.connect('item-added', self.item_added)
+        self.hotbar.bind_owner(self.tool)
 
         self.tool.selected_func = self.selected_func
         self.tool.transformed_func = self.transformed_func
@@ -146,7 +146,7 @@ class AppWindow (Gtk.ApplicationWindow):
     def transformed_func(self,obj):
         self.propbar.set_obj(obj)
 
-    def item_added(self,sender,obj):
+    def item_added(self,sender,*args):
         self.panel.set_params(self.tool.get_items())
 
     def item_removed(self,sender,obj):
