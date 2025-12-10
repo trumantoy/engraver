@@ -218,6 +218,7 @@
                                                 </child>
                                                 <child>
                                                     <object class="GtkEntry" id="text">
+                                                        <signal name="activate" handler="text_activate" />
                                                     </object>
                                                 </child>
                                             </object>

@@ -151,11 +151,12 @@ class Element(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.params = dict()
-        self.params['power'] = 100
         self.params['excutable'] = True
-        self.params['light_source'] = '红光'
+        self.params['engraving_mode'] = 'stroke'
+        self.params['light_source'] = 'red'
+        self.params['power'] = 100
         self.params['speed'] = 100
-        self.params['engraving_mode'] = '填充雕刻'
+        self.obj = None
 
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
@@ -188,62 +189,80 @@ class Label(Element):
     def __init__(self,text,font_size,family,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
         
-        self.text = text
         self.font_size = font_size
         self.family = family
+        self.pixelsize = pixelsize
         
+        self.set_text(text)
+
+    def draw_to_surface(self,surface : cairo.Surface):
+        # 3. 创建最终零留白图片表面
+        ctx = cairo.Context(surface)
+
+        # 5. 配置字体（与临时上下文一致，确保尺寸匹配）
+        ctx.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        ctx.set_font_size(self.font_size)
+
+        # 7. 绘制文字（黑色，可修改RGB值换颜色）
+        ctx.set_source_rgb(1, 1, 1)
+        ctx.move_to(-self.text_info.x_bearing, -self.text_info.y_bearing)
+        ctx.text_path(self.text)
+
+        if self.params['engraving_mode'] == 'fill': ctx.fill()
+        else: ctx.stroke()
+    
+    def draw_to_image(self):
         temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)  # 临时1x1像素表面
         temp_ctx = cairo.Context(temp_surface)
         
         # 配置与最终绘制一致的字体
-        temp_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        temp_ctx.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         temp_ctx.set_font_size(self.font_size)
         
         # 获取文字的详细边界信息（核心参数）
-        text_info = temp_ctx.text_extents(text)
-        text_width = text_info.width          # 文字左边缘到右边缘的实际宽度（无多余）
-        text_height = text_info.height        # 文字上边缘到下边缘的实际高度（含上下伸部分）
-        text_x_bearing = text_info.x_bearing  # 文字左边缘相对于绘制起点的偏移（通常为0，无需修正）
-        text_y_bearing = text_info.y_bearing  # 文字上边缘相对于绘制起点的偏移（负数值，需修正避免顶部裁剪）
+        self.text_info = temp_ctx.text_extents(self.text)
+        text_width = self.text_info.width          # 文字左边缘到右边缘的实际宽度（无多余）
+        text_height = self.text_info.height        # 文字上边缘到下边缘的实际高度（含上下伸部分）
 
         # 2. 图片尺寸=文字实际尺寸（零留白关键）
         img_width = int(text_width)
         img_height = int(text_height)
 
-        # 3. 创建最终零留白图片表面
-        final_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
-        final_ctx = cairo.Context(final_surface)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
+        self.draw_to_surface(surface)
 
-        # 5. 配置字体（与临时上下文一致，确保尺寸匹配）
-        final_ctx.select_font_face(family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        final_ctx.set_font_size(self.font_size)
-
-        # 6. 修正文字位置：抵消y_bearing偏移，确保文字顶部贴合图片上边框
-        # x起点：0（文字左边缘=图片左边缘）
-        text_x = -text_x_bearing  # 通常x_bearing=0，即text_x=0
-        # y起点：-text_y_bearing（抵消上边缘偏移，文字顶部=图片上边缘）
-        text_y = -text_y_bearing
-
-        # 7. 绘制文字（黑色，可修改RGB值换颜色）
-        final_ctx.set_source_rgb(1, 1, 1)
-        final_ctx.move_to(text_x, text_y)
-        final_ctx.show_text(text)
-        argb_array = np.frombuffer(final_surface.get_data(), dtype=np.uint8).reshape((img_height, img_width, 4))
-
-        tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
-        tex_map = gfx.TextureMap(tex)
-        self.width = img_width * pixelsize / 1000
-        self.height = img_height * pixelsize / 1000
+        return surface
+    
+    def set_text(self,text):
+        self.text = text
         
+        surface = self.draw_to_image()        
+        argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
+        tex = gfx.Texture(argb[:, :, [1, 2, 3, 0]],dim=2)
+        tex_map = gfx.TextureMap(tex)
+        self.width = argb.shape[1] * self.pixelsize / 1000
+        self.height = argb.shape[0] * self.pixelsize / 1000
+        
+        self.remove(self.obj)
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.add(self.obj)
+
+    def set_engraving_mode(self,mode : str):
+        self.params['engraving_mode'] = mode
+        surface = self.draw_to_image()
+        argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
+        tex = gfx.Texture(argb[:, :, [1, 2, 3, 0]],dim=2)
+        tex_map = gfx.TextureMap(tex)
+        self.width = argb.shape[1] * self.pixelsize / 1000
+        self.height = argb.shape[0] * self.pixelsize / 1000
+        self.remove(self.obj)
         self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(self.obj)
 
 class Bitmap(Element):
     def __init__(self,pixelsize,im = None,*args,**kwargs):
         super().__init__(*args,**kwargs)
-
-        if im is None:
-            im = (np.indices((10, 10)).sum(axis=0) % 2).astype(np.float32) * 255
+        self.pixelsize = pixelsize
 
         self.height = im.shape[0] * pixelsize / 1000
         self.width = im.shape[1] * pixelsize / 1000
@@ -255,6 +274,10 @@ class Bitmap(Element):
 
     def get_image(self):
         return self.im.astype(np.uint8)
+    
+    def draw_to_surface(self,surface : cairo.Surface):
+
+        pass
     
 class Vector(Element):
     def __init__(self,lines,*args,**kwargs):
@@ -277,6 +300,21 @@ class Vector(Element):
             self.obj.add(line)
 
         self.add(self.obj)
+
+    def draw_to_surface(self,surface : cairo.Surface):
+        pass
+
+    def set_engraving_mode(self,mode : str):
+        self.params['engraving_mode'] = mode
+        # argb_array = self.draw_to_image()
+        # tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
+        # tex_map = gfx.TextureMap(tex)
+        # self.width = argb_array.shape[1] * self.pixelsize / 1000
+        # self.height = argb_array.shape[0] * self.pixelsize / 1000
+        # self.remove(self.obj)
+        # self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        # self.add(self.obj)
+
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -431,6 +469,8 @@ class Engravtor(gfx.WorldObject):
         target_height = (aabb[1][2] - aabb[0][2])
         
         element = Label('中国智造',72,'KaiTi',self.pixelsize,name='文本')
+        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
         self.target_area.add(element)
 
@@ -439,7 +479,8 @@ class Engravtor(gfx.WorldObject):
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         element = Bitmap(self.pixelsize,im,name='图片')
-        element.local.scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
         self.target_area.add(element)
 
@@ -449,9 +490,9 @@ class Engravtor(gfx.WorldObject):
         target_height = (aabb[1][2] - aabb[0][2])
         
         element = Vector(lines,name='矢量')
-        element.local.scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
-
         self.target_area.add(element)
 
     def export_svg(self,file_name):

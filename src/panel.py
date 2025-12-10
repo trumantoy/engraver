@@ -18,7 +18,7 @@ class Panel (Gtk.Box):
     lstbox_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
-    btn_engraving_mode_outline = Gtk.Template.Child('a')
+    btn_engraving_mode_stroke = Gtk.Template.Child('a')
     btn_engraving_mode_full = Gtk.Template.Child('b')
     dp_light_source = Gtk.Template.Child('light_source')
     spin_power = Gtk.Template.Child('power')
@@ -105,30 +105,45 @@ class Panel (Gtk.Box):
         self.obj = obj
 
         if not obj: return
+        self.btn_engraving_mode_stroke.set_sensitive(True)
+
         if obj.__class__.__name__ == 'Label':
             self.label_kind.set_label('文本')
             self.image_icon.set_from_icon_name('format-text-bold')
-            self.btn_engraving_mode_outline.set_sensitive(True)
-            if obj.params['engraving_mode'] == '线条雕刻':
-                self.btn_engraving_mode_outline.set_active(True)
-            else:
+            
+            if obj.params['engraving_mode'] == 'stroke':
+                self.btn_engraving_mode_stroke.set_active(True)
+            elif obj.params['engraving_mode'] == 'fill':
                 self.btn_engraving_mode_full.set_active(True)
+
         elif obj.__class__.__name__ == 'Vector':
             self.label_kind.set_label('矢量图')
             self.image_icon.set_from_icon_name('folder-publicshare-symbolic')
-            self.btn_engraving_mode_outline.set_sensitive(False)
-            self.btn_engraving_mode_full.set_active(True)
+
+            if obj.params['engraving_mode'] == 'stroke':
+                self.btn_engraving_mode_stroke.set_active(True)
+            elif obj.params['engraving_mode'] == 'fill':
+                self.btn_engraving_mode_full.set_active(True)
+
         else:
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')
-            self.btn_engraving_mode_outline.set_sensitive(False)
+            self.btn_engraving_mode_stroke.set_sensitive(False)
             self.btn_engraving_mode_full.set_active(True)
         
-        self.dp_light_source.set_selected(0 if obj.params['light_source'] == '蓝光' else 1)
+        self.dp_light_source.set_selected(0 if obj.params['light_source'] == 'blue' else 1)
         self.spin_power.set_value(obj.params['power'])
         self.spin_speed.set_value(obj.params['speed'])
         self.swt_excutable.set_active(obj.params['excutable'])
-    
+
+    @Gtk.Template.Callback()
+    def btn_engraving_mode_stroke_clicked(self,btn):
+        self.obj.set_engraving_mode('stroke')
+
+    @Gtk.Template.Callback()
+    def btn_engraving_mode_full_clicked(self,btn):
+        self.obj.set_engraving_mode('fill')
+
     def set_params(self,items):
         self.items = items
         self.lstbox_params.remove_all()
@@ -141,7 +156,13 @@ class Panel (Gtk.Box):
             if item.__class__.__name__ == 'Label':
                 img = Gtk.Image()
                 img.set_pixel_size(80)
-                img.set_from_icon_name('format-text-bold-symbolic')
+                
+                import io
+                f = io.BytesIO()
+                surface = item.draw_to_image()
+                surface.write_to_png(f)
+                texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(f.getvalue()))
+                img.set_from_paintable(texture)
                 
                 box_1 = Gtk.Box()
                 box_1.set_orientation(Gtk.Orientation.VERTICAL)
@@ -150,13 +171,15 @@ class Panel (Gtk.Box):
                 box_1.set_valign(Gtk.Align.CENTER)
 
                 param = Gtk.Label()
-                param.set_label(f'<span size="large">{item.params["engraving_mode"]}</span>')
+                engraving_mode = '线条' if item.params["engraving_mode"] == 'stroke' else '填充'
+                param.set_label(f'<span size="large">{engraving_mode}</span>')
                 param.set_use_markup(True)
                 param.set_halign(Gtk.Align.START)
                 box_1.append(param)
 
                 param = Gtk.Label()
-                param.set_label(f'<span size="medium">{item.params["light_source"]}</span>')
+                light_source = '蓝光' if item.params["light_source"] == 'blue' else '红光'
+                param.set_label(f'<span size="medium">{light_source}</span>')
                 param.set_use_markup(True)
                 param.set_halign(Gtk.Align.START)
                 box_1.append(param)

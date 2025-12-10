@@ -196,12 +196,14 @@
                                                 <child>
                                                     <object class="GtkToggleButton" id="a">
                                                         <property name="label">线条雕刻</property>
+                                                        <signal name="clicked" handler="btn_engraving_mode_stroke_clicked" />
                                                     </object>
                                                 </child>
                                                 <child>
                                                     <object class="GtkToggleButton" id="b">         
                                                         <property name="label">填充雕刻</property>
                                                         <property name="group">a</property>
+                                                        <signal name="clicked" handler="btn_engraving_mode_full_clicked" />
                                                     </object>
                                                 </child>
                                                 <!-- <child>

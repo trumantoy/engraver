@@ -248,6 +248,10 @@ class Propbar (Gtk.ScrolledWindow):
     @Gtk.Template.Callback()
     def btn_remove_clicked(self,button):
         self.emit('item-removed',self.obj)
+    
+    @Gtk.Template.Callback()
+    def text_activate(self,entry):
+        self.obj.set_text(entry.get_text())
 
     def set_obj(self,obj):
         if not obj: return
