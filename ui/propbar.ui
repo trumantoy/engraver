@@ -243,7 +243,7 @@
                         </child>
                         <child>
                             <object class="GtkStackPage">
-                                <property name="name">Vector</property>
+                                <property name="name">Vectors</property>
                                 <property name="child">
                                     <object class="GtkBox">
                                         <property name="orientation">horizontal</property>

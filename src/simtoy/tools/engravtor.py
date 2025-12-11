@@ -236,9 +236,9 @@ class Label(Element):
     def set_text(self,text):
         self.text = text
         
-        surface = self.draw_to_image()        
+        surface = self.draw_to_image()
         argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
-        tex = gfx.Texture(argb[:, :, [1, 2, 3, 0]],dim=2)
+        tex = gfx.Texture(argb,dim=2)
         tex_map = gfx.TextureMap(tex)
         self.width = argb.shape[1] * self.pixelsize / 1000
         self.height = argb.shape[0] * self.pixelsize / 1000
@@ -249,18 +249,10 @@ class Label(Element):
 
     def set_engraving_mode(self,mode : str):
         self.params['engraving_mode'] = mode
-        surface = self.draw_to_image()
-        argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
-        tex = gfx.Texture(argb[:, :, [1, 2, 3, 0]],dim=2)
-        tex_map = gfx.TextureMap(tex)
-        self.width = argb.shape[1] * self.pixelsize / 1000
-        self.height = argb.shape[0] * self.pixelsize / 1000
-        self.remove(self.obj)
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
-        self.add(self.obj)
+        self.set_text(self.text)
 
 class Bitmap(Element):
-    def __init__(self,pixelsize,im = None,*args,**kwargs):
+    def __init__(self,pixelsize,im,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.pixelsize = pixelsize
 
@@ -268,21 +260,36 @@ class Bitmap(Element):
         self.width = im.shape[1] * pixelsize / 1000
         tex = gfx.Texture(im,dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False)) 
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(self.obj)
+ 
         self.im = im
+        self.draw_to_image()
 
     def get_image(self):
         return self.im.astype(np.uint8)
     
     def draw_to_surface(self,surface : cairo.Surface):
+        img_h, img_w, _ = self.im.shape
 
-        pass
+        ctx = cairo.Context(surface)
+        stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, img_w)
+        surface_im = cairo.ImageSurface.create_for_data(self.im.data, cairo.FORMAT_ARGB32, img_w, img_h, stride)
+        ctx.set_source_surface(surface_im, 0, 0)
+        ctx.paint()
+
+    def draw_to_image(self):
+        img_width = self.im.shape[1]
+        img_height = self.im.shape[0]
+
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
+        self.draw_to_surface(surface)
+        return surface
     
-class Vector(Element):
-    def __init__(self,lines,*args,**kwargs):
+class Vectors(Element):
+    def __init__(self,lines,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
-
+        self.pixelsize = pixelsize
         points = np.concatenate(lines,axis=0)
         min_x = points[:,0].min()
         min_y = points[:,1].min()
@@ -291,30 +298,58 @@ class Vector(Element):
         self.width = (max_x - min_x)
         self.height = (max_y - min_y)
 
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(color=(1, 1, 1, 0),depth_test=False,flat_shading=True))
-
-        for line in [np.array(line) for line in lines]:
-            line = line - [min_x + self.width/2,min_y + self.height/2,0]
-            line = line.astype(np.float32)
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height))
+        self.lines = []
+        for line in lines:
+            line = np.array(line)[:,[0,1]]
+            line = line - [min_x + self.width/2,min_y + self.height/2]
+            line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))            # print(line)
             line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color='yellow',depth_test=False))
+            self.lines.append(line)
             self.obj.add(line)
-
         self.add(self.obj)
 
     def draw_to_surface(self,surface : cairo.Surface):
-        pass
+        ctx = cairo.Context(surface)
+        ctx.set_source_rgba(1,1,0,1)
+        ctx.translate(surface.get_width()/2,surface.get_height()/2)
+        for line in self.lines:
+            start = line.geometry.positions.data[0]
+            start = start * self.local.scale_x * 1000 / self.pixelsize
+            ctx.move_to(start[0],-start[1])
+            for end in line.geometry.positions.data[1:]:
+                end = end * self.local.scale_x * 1000 / self.pixelsize
+                ctx.line_to(end[0],-end[1])
+            ctx.close_path()
+
+            if self.params['engraving_mode'] == 'fill': 
+                ctx.fill()
+            else: 
+                ctx.stroke()
+
+    def draw_to_image(self):
+        phy_width = int(self.width * self.local.scale_x * 1000)
+        phy_height = int(self.height * self.local.scale_x * 1000)
+        img_width = int(phy_width / self.pixelsize)
+        img_height = int(phy_height / self.pixelsize)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
+        self.draw_to_surface(surface)
+        return surface
 
     def set_engraving_mode(self,mode : str):
         self.params['engraving_mode'] = mode
-        # argb_array = self.draw_to_image()
-        # tex = gfx.Texture(argb_array[:, :, [1, 2, 3, 0]],dim=2)
-        # tex_map = gfx.TextureMap(tex)
-        # self.width = argb_array.shape[1] * self.pixelsize / 1000
-        # self.height = argb_array.shape[0] * self.pixelsize / 1000
-        # self.remove(self.obj)
-        # self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
-        # self.add(self.obj)
-
+        self.remove(self.obj)
+        if mode == 'fill':
+            surface = self.draw_to_image()
+            argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
+            tex = gfx.Texture(argb[...,[2,1,0,3]],dim=2)
+            tex_map = gfx.TextureMap(tex)
+            self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        else:
+            self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height))
+            for line in self.lines:
+                self.obj.add(line)
+        self.add(self.obj)
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -489,7 +524,7 @@ class Engravtor(gfx.WorldObject):
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         
-        element = Vector(lines,name='矢量')
+        element = Vectors(lines,self.pixelsize,name='矢量')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height

@@ -184,7 +184,7 @@ class Hotbar (Gtk.ScrolledWindow):
                 return
             else:
                 im = Image.open(file_path)
-                image_array = np.array(im)
+                image_array = np.array(im.convert('RGBA'))
                 self.owner.add_bitmap(image_array)                    
                 self.emit('item-added',None)
 
@@ -212,11 +212,11 @@ class Hotbar (Gtk.ScrolledWindow):
             except:
                 return
             else:
-                doc = ezdxf.readfile("a.dxf")
+                doc = ezdxf.readfile(file_path)
                 msp = doc.modelspace()
                 lines = []
                 for polyline in msp.query("LWPOLYLINE"):
-                    points = [(p[0], p[1], 0) for p in polyline.get_points()]  # 仅取XY坐标
+                    points = [(p[0],p[1]) for p in polyline.get_points()]  # 仅取XY坐标
                     lines.append(points)
 
                 self.owner.add_vectors(lines)

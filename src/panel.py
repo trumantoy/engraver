@@ -4,7 +4,7 @@ import gi
 from simtoy.tools import engravtor
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk, GObject, Gio, Gdk
-
+from PIL import Image
 import pygfx as gfx
 from simtoy import *
 
@@ -15,7 +15,7 @@ class Panel (Gtk.Box):
     btn_device_manager = Gtk.Template.Child('device_manager')
     btn_device_discovery = Gtk.Template.Child('device_discovery')
     stack = Gtk.Template.Child('stack')
-    lstbox_params = Gtk.Template.Child('params')
+    lsv_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
     btn_engraving_mode_stroke = Gtk.Template.Child('a')
@@ -55,9 +55,12 @@ class Panel (Gtk.Box):
         GLib.timeout_add(1000, self.update_status)
 
         model = Gio.ListStore(item_type=GObject.Object)
-        self.param_selection = Gtk.SingleSelection.new(model)
-        self.param_selection.set_autoselect(True)
-        self.param_selection.set_can_unselect(True)
+        self.param_selection = Gtk.NoSelection.new(model)
+
+        factory = Gtk.SignalListItemFactory()
+        factory.connect("setup", self.setup_listitem)
+        factory.connect("bind", self.bind_listitem)
+        self.lsv_params.set_factory(factory)
 
         self.items = None
         self.obj = None
@@ -96,10 +99,6 @@ class Panel (Gtk.Box):
         device.controller = controller
         self.selection.get_model().append(device)
 
-    @Gtk.Template.Callback()
-    def on_activate_cursor_row(self,listbox, row):
-        print(listbox)
-
     def set_obj(self,obj):
         self.stack.set_visible_child_name('参数' if obj else '总览')
         self.obj = obj
@@ -116,7 +115,7 @@ class Panel (Gtk.Box):
             elif obj.params['engraving_mode'] == 'fill':
                 self.btn_engraving_mode_full.set_active(True)
 
-        elif obj.__class__.__name__ == 'Vector':
+        elif obj.__class__.__name__ == 'Vectors':
             self.label_kind.set_label('矢量图')
             self.image_icon.set_from_icon_name('folder-publicshare-symbolic')
 
@@ -144,107 +143,102 @@ class Panel (Gtk.Box):
     def btn_engraving_mode_full_clicked(self,btn):
         self.obj.set_engraving_mode('fill')
 
+    def setup_listitem(self, factory, lsi):
+        box = Gtk.Box()
+        box.set_size_request(-1,80)
+        box.set_spacing(5)
+
+        img = Gtk.Image()
+        img.set_pixel_size(80)
+        img_bg = Image.new("RGBA", (img.get_pixel_size(), img.get_pixel_size()), (50,50,50,255))
+        texture = Gdk.MemoryTexture.new(img.get_pixel_size(),img.get_pixel_size(),Gdk.MemoryFormat.B8G8R8A8,GLib.Bytes.new(img_bg.tobytes()),img.get_pixel_size()*4)
+        img.set_from_paintable(texture)
+        
+        box.append(img)
+    
+        box_1 = Gtk.Box()
+        box_1.set_orientation(Gtk.Orientation.VERTICAL)
+        box_1.set_spacing(1)
+        box_1.set_hexpand(True)
+        box_1.set_valign(Gtk.Align.CENTER)
+
+        mode = Gtk.Label()
+        mode.set_label(f'<span size="large">模式</span>')
+        mode.set_use_markup(True)
+        mode.set_halign(Gtk.Align.START)
+        box_1.append(mode)
+
+        light_source = Gtk.Label()
+        light_source.set_label(f'<span size="medium">光源</span>')
+        light_source.set_use_markup(True)
+        light_source.set_halign(Gtk.Align.START)
+        box_1.append(light_source)
+
+        box_11 = Gtk.Box()
+        box_11.set_spacing(20)
+        box_11.set_hexpand(True)
+        box_11.set_valign(Gtk.Align.CENTER)
+
+        power = Gtk.Label()
+        power.set_label(f'<span color="gray" size="medium">0%</span>')
+        power.set_use_markup(True)
+        power.set_halign(Gtk.Align.START)
+        box_11.append(power)
+
+        speed = Gtk.Label()
+        speed.set_label(f'<span color="gray" size="medium">0mm/s</span>')
+        speed.set_use_markup(True)
+        speed.set_halign(Gtk.Align.START)
+        box_11.append(speed)
+        box_1.append(box_11)
+
+        box.append(box_1)
+        lsi.set_child(box)
+
+    def bind_listitem(self, factory, lsi):
+        item = lsi.get_item()
+        box = lsi.get_child()
+        img = box.get_first_child()
+        box_1 = img.get_next_sibling()
+
+        lbl_mode = box_1.get_first_child()
+        lbl_light_source = lbl_mode.get_next_sibling()
+        box_11 = lbl_light_source.get_next_sibling()
+        lbl_power = box_11.get_first_child()
+        lbl_speed = lbl_power.get_next_sibling()
+
+        surface = item.obj.draw_to_image()
+        argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
+        img_size = img.get_pixel_size()
+        img_content = Image.fromarray(argb[...,[2,1,0,3]],mode="RGBA")
+        img_content.thumbnail((img_size, img_size))
+        img_bg = Image.new("RGBA", (img_size, img_size), (50,50,50,255))
+        img_bg.paste(img_content, (int((img_size - img_content.size[0])/2), int((img_size - img_content.size[1])/2)), mask=img_content.split()[3])
+        texture = Gdk.MemoryTexture.new(img_size,img_size,Gdk.MemoryFormat.B8G8R8A8,GLib.Bytes.new(np.asarray(img_bg)[...,[2,1,0,3]].tobytes()),img_size*4)
+        img.set_from_paintable(texture)
+
+        mode = '线条' if item.obj.params["engraving_mode"] == 'stroke' else '填充'
+        lbl_mode.set_label(f'<span size="large">{mode}</span>')
+        light_source = '蓝光' if item.obj.params["light_source"] == 'blue' else '红光'
+        lbl_light_source.set_label(f'<span size="medium">{light_source}</span>')
+        lbl_power.set_label(f'<span color="lightgray" size="medium">{item.obj.params["power"]}%</span>')
+        lbl_speed.set_label(f'<span color="lightgray" size="medium">{item.obj.params["speed"]}mm/s</span>')
+
+    @Gtk.Template.Callback()
+    def on_params_activate(self, sender, idx):
+        print(idx)
+        
+        # self.param_selection.
+
     def set_params(self,items):
         self.items = items
-        self.lstbox_params.remove_all()
-
+        model = self.param_selection.get_model()
+        model.remove_all()
         for item in items:
-            box = Gtk.Box()
-            box.set_size_request(-1,80)
-            box.set_spacing(5)
-
-            if item.__class__.__name__ == 'Label':
-                img = Gtk.Image()
-                img.set_pixel_size(80)
-                
-                import io
-                f = io.BytesIO()
-                surface = item.draw_to_image()
-                surface.write_to_png(f)
-                texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(f.getvalue()))
-                img.set_from_paintable(texture)
-                
-                box_1 = Gtk.Box()
-                box_1.set_orientation(Gtk.Orientation.VERTICAL)
-                box_1.set_spacing(1)
-                box_1.set_hexpand(True)
-                box_1.set_valign(Gtk.Align.CENTER)
-
-                param = Gtk.Label()
-                engraving_mode = '线条' if item.params["engraving_mode"] == 'stroke' else '填充'
-                param.set_label(f'<span size="large">{engraving_mode}</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_1.append(param)
-
-                param = Gtk.Label()
-                light_source = '蓝光' if item.params["light_source"] == 'blue' else '红光'
-                param.set_label(f'<span size="medium">{light_source}</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_1.append(param)
-
-                box_11 = Gtk.Box()
-                box_11.set_spacing(20)
-                box_11.set_hexpand(True)
-                box_11.set_valign(Gtk.Align.CENTER)
-
-                param = Gtk.Label()
-                param.set_label(f'<span color="gray" size="medium">{item.params["power"]}%</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_11.append(param)
-
-                param = Gtk.Label()
-                param.set_label(f'<span color="gray" size="medium">{item.params["speed"]}mm/s</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_11.append(param)
-                box_1.append(box_11)
-            else:
-                img = Gtk.Image()
-                img.set_pixel_size(80)
-                img.set_from_icon_name('image-x-generic-symbolic')
-                    
-                box_1 = Gtk.Box()
-                box_1.set_orientation(Gtk.Orientation.VERTICAL)
-                box_1.set_spacing(1)
-                box_1.set_hexpand(True)
-                box_1.set_valign(Gtk.Align.CENTER)
-
-                param = Gtk.Label()
-                param.set_label('<span size="large">雕刻</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_1.append(param)
-
-                param = Gtk.Label()
-                param.set_label(f'<span size="medium">{item.params["light_source"]}</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_1.append(param)
-
-                box_11 = Gtk.Box()
-                box_11.set_spacing(20)
-                box_11.set_hexpand(True)
-                box_11.set_valign(Gtk.Align.CENTER)
-
-                param = Gtk.Label()
-                param.set_label(f'<span color="gray" size="medium">{item.params["power"]}%</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_11.append(param)
-
-                param = Gtk.Label()
-                param.set_label(f'<span color="gray" size="medium">{item.params["speed"]}mm/s</span>')
-                param.set_use_markup(True)
-                param.set_halign(Gtk.Align.START)
-                box_11.append(param)
-                box_1.append(box_11)
-
-            box.append(img)
-            box.append(box_1)
-            self.lstbox_params.append(box)
+            param = GObject.Object()
+            param.obj = item
+            model.append(param)
+        self.lsv_params.set_model(self.param_selection)
 
     @GObject.Signal(return_type=bool, arg_types=(object,))
     def presented(self,*args): pass
@@ -295,7 +289,6 @@ class Panel (Gtk.Box):
     def btn_start_clicked(self,sender):
         pass
         
-
     # def listview_selection_changed(self, model, *args):
     #     i = model.get_selected()
     #     listviewitem = model.get_item(i)

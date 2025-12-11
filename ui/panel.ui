@@ -109,12 +109,12 @@
                                             </object>
                                         </child>
                                         <child>
-                                            <object class="GtkListBox" id="params">
+                                            <object class="GtkListView" id="params">
                                                 <property name="vexpand">True</property>
                                                 <property name="margin-start">10</property>
                                                 <property name="margin-end">10</property>
-                                                <property name="selection-mode">GTK_SELECTION_NONE</property>
-                                                <signal name="row-activated" handler="on_activate_cursor_row" swapped="no"/>
+                                                <property name="single-click-activate">True</property>
+                                                <signal name="activate" handler="on_params_activate" swapped="no"/>
                                             </object>
                                         </child>
                                     </object>
