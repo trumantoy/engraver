@@ -142,6 +142,7 @@ class AppWindow (Gtk.ApplicationWindow):
         self.propbar.set_visible(obj)
         self.propbar.set_obj(obj)
         self.panel.set_obj(obj)
+        self.panel.set_params(self.tool.get_items())
 
     def transformed_func(self,obj):
         self.propbar.set_obj(obj)

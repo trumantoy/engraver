@@ -227,8 +227,6 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def on_params_activate(self, sender, idx):
         print(idx)
-        
-        # self.param_selection.
 
     def set_params(self,items):
         self.items = items

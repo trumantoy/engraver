@@ -191,7 +191,7 @@ class Label(Element):
         
         self.font_size = font_size
         self.family = family
-        self.pixelsize = pixelsize
+        self.pixelsize_in_mm = pixelsize
         
         self.set_text(text)
 
@@ -240,8 +240,8 @@ class Label(Element):
         argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
         tex = gfx.Texture(argb,dim=2)
         tex_map = gfx.TextureMap(tex)
-        self.width = argb.shape[1] * self.pixelsize / 1000
-        self.height = argb.shape[0] * self.pixelsize / 1000
+        self.width = argb.shape[1] * self.pixelsize_in_mm / 1000
+        self.height = argb.shape[0] * self.pixelsize_in_mm / 1000
         
         self.remove(self.obj)
         self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
@@ -254,7 +254,7 @@ class Label(Element):
 class Bitmap(Element):
     def __init__(self,pixelsize,im,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.pixelsize = pixelsize
+        self.pixelsize_in_mm = pixelsize
 
         self.height = im.shape[0] * pixelsize / 1000
         self.width = im.shape[1] * pixelsize / 1000
@@ -274,7 +274,7 @@ class Bitmap(Element):
 
         ctx = cairo.Context(surface)
         stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, img_w)
-        surface_im = cairo.ImageSurface.create_for_data(self.im.data, cairo.FORMAT_ARGB32, img_w, img_h, stride)
+        surface_im = cairo.ImageSurface.create_for_data(self.im[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, img_w, img_h, stride)
         ctx.set_source_surface(surface_im, 0, 0)
         ctx.paint()
 
@@ -289,7 +289,7 @@ class Bitmap(Element):
 class Vectors(Element):
     def __init__(self,lines,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.pixelsize = pixelsize
+        self.pixelsize_in_mm = pixelsize
         points = np.concatenate(lines,axis=0)
         min_x = points[:,0].min()
         min_y = points[:,1].min()
@@ -315,10 +315,10 @@ class Vectors(Element):
         ctx.translate(surface.get_width()/2,surface.get_height()/2)
         for line in self.lines:
             start = line.geometry.positions.data[0]
-            start = start * self.local.scale_x * 1000 / self.pixelsize
+            start = start * self.local.scale_x * 1000 / self.pixelsize_in_mm
             ctx.move_to(start[0],-start[1])
             for end in line.geometry.positions.data[1:]:
-                end = end * self.local.scale_x * 1000 / self.pixelsize
+                end = end * self.local.scale_x * 1000 / self.pixelsize_in_mm
                 ctx.line_to(end[0],-end[1])
             ctx.close_path()
 
@@ -330,8 +330,8 @@ class Vectors(Element):
     def draw_to_image(self):
         phy_width = int(self.width * self.local.scale_x * 1000)
         phy_height = int(self.height * self.local.scale_x * 1000)
-        img_width = int(phy_width / self.pixelsize)
-        img_height = int(phy_height / self.pixelsize)
+        img_width = int(phy_width / self.pixelsize_in_mm)
+        img_height = int(phy_height / self.pixelsize_in_mm)
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
         self.draw_to_surface(surface)
         return surface
@@ -377,11 +377,11 @@ class Engravtor(gfx.WorldObject):
         persp_camera.show_pos(self.target_area.world.position,up=[0,0,1],depth=1.0)
         self.persp_camera = persp_camera
         
-        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize * 2/1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
+        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize_in_mm * 2/1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
         self.focus.render_order = 1
         self.target_area.add(self.focus)
 
-        self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize/1000,thickness_space='world',color=(1, 0, 0, 0)))
+        self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize_in_mm/1000,thickness_space='world',color=(1, 0, 0, 0)))
         self.target_area.add(self.laser)
 
         self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
@@ -464,7 +464,7 @@ class Engravtor(gfx.WorldObject):
     def init_params(self):
         self.y_lim = self.x_lim = (0,0.100)
         self.light_spot_size = 0.0000075
-        self.pixelsize = 0.1
+        self.pixelsize_in_mm = 0.1
         self.paths = list()
         self.speed = 100
         self.power = 0
@@ -503,7 +503,7 @@ class Engravtor(gfx.WorldObject):
         aabb = self.target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         
-        element = Label('中国智造',72,'KaiTi',self.pixelsize,name='文本')
+        element = Label('中国智造',72,'KaiTi',self.pixelsize_in_mm,name='文本')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -513,7 +513,7 @@ class Engravtor(gfx.WorldObject):
         target = self.target
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
-        element = Bitmap(self.pixelsize,im,name='图片')
+        element = Bitmap(self.pixelsize_in_mm,im,name='图片')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -524,7 +524,7 @@ class Engravtor(gfx.WorldObject):
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         
-        element = Vectors(lines,self.pixelsize,name='矢量')
+        element = Vectors(lines,self.pixelsize_in_mm,name='矢量')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -543,7 +543,7 @@ class Engravtor(gfx.WorldObject):
                 if type(obj) == Label:
                     obj : Label
                     cr.set_source_rgb(1, 0, 0)
-                    cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize)
+                    cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize_in_mm)
                     cr.set_font_size(obj.font_size * 1000)
                     cr.select_font_face(obj.family)
                     ascent, descent, font_height, max_x_advance, max_y_advance = cr.font_extents()
@@ -559,8 +559,8 @@ class Engravtor(gfx.WorldObject):
                 elif type(obj) == Bitmap:
                     obj : Bitmap
                     aabb = obj.get_bounding_box()
-                    width = int((aabb[1][0] - aabb[0][0]) * 1000 / self.pixelsize)
-                    height = int((aabb[1][1] - aabb[0][1]) * 1000 / self.pixelsize)
+                    width = int((aabb[1][0] - aabb[0][0]) * 1000 / self.pixelsize_in_mm)
+                    height = int((aabb[1][1] - aabb[0][1]) * 1000 / self.pixelsize_in_mm)
 
                     image = Image.fromarray(obj.get_image())
                     image = image.resize((width,height),resample=Image.Resampling.NEAREST)
@@ -569,10 +569,10 @@ class Engravtor(gfx.WorldObject):
                     
                     image_surface = cairo.ImageSurface.create_for_data(rgba_array.data,cairo.Format.ARGB32,width,height)
 
-                    cr.scale(self.pixelsize,self.pixelsize)
+                    cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
                     cr.set_source_surface(image_surface, 
-                        obj.local.x * 1000 / self.pixelsize - image_surface.get_width() / 2, 
-                        -(obj.local.y * 1000 / self.pixelsize + image_surface.get_height() / 2))
+                        obj.local.x * 1000 / self.pixelsize_in_mm - image_surface.get_width() / 2, 
+                        -(obj.local.y * 1000 / self.pixelsize_in_mm + image_surface.get_height() / 2))
                 
                     cr.paint()
                 else:
