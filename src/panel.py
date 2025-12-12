@@ -1,12 +1,12 @@
 import gi
 
 
-from simtoy.tools import engravtor
 gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk, GObject, Gio, Gdk
 from PIL import Image
 import pygfx as gfx
 from simtoy import *
+from simtoy.tools.engravtor import *
 
 @Gtk.Template(filename='ui/panel.ui')
 class Panel (Gtk.Box):
@@ -49,9 +49,9 @@ class Panel (Gtk.Box):
         Gtk.StyleContext.add_provider_for_display(self.get_display(),self.provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         model = Gio.ListStore(item_type=GObject.Object)
-        self.selection = Gtk.SingleSelection.new(model)
-        self.selection.set_autoselect(True)
-        self.selection.set_can_unselect(True)
+        self.device_selection = Gtk.SingleSelection.new(model)
+        self.device_selection.set_autoselect(True)
+        self.device_selection.set_can_unselect(True)
         GLib.timeout_add(1000, self.update_status)
 
         model = Gio.ListStore(item_type=GObject.Object)
@@ -64,9 +64,12 @@ class Panel (Gtk.Box):
 
         self.items = None
         self.obj = None
+    
+    def bind_owner(self,tool : Engravtor):
+        self.owner = tool
 
     def update_status(self):
-        item = self.selection.get_selected_item()
+        item = self.device_selection.get_selected_item()
         if item.controller.is_connected():
             # self.img_status.set_from_icon_name('emblem-ok-symbolic')
             self.lbl_status.set_label('已连接')
@@ -78,7 +81,7 @@ class Panel (Gtk.Box):
     def device_manager_clicked(self, btn):
         from device_manager import DeviceManagerDialog
         dlg = DeviceManagerDialog()
-        dlg.lsv_devices.set_model(self.selection)
+        dlg.lsv_devices.set_model(self.device_selection)
         dlg.set_modal(True)
         dlg.present()
     
@@ -97,10 +100,10 @@ class Panel (Gtk.Box):
     def add_device(self,controller):
         device = GObject.Object()
         device.controller = controller
-        self.selection.get_model().append(device)
+        self.device_selection.get_model().append(device)
 
     def set_obj(self,obj):
-        self.stack.set_visible_child_name('参数' if obj else '总览')
+        self.stack.set_visible_child_name('param' if obj else 'overview')
         self.obj = obj
 
         if not obj: return
@@ -138,10 +141,16 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def btn_engraving_mode_stroke_clicked(self,btn):
         self.obj.set_engraving_mode('stroke')
+        model = self.param_selection.get_model()
+        self.param_selection.set_model(None)
+        self.param_selection.set_model(model)
 
     @Gtk.Template.Callback()
     def btn_engraving_mode_full_clicked(self,btn):
         self.obj.set_engraving_mode('fill')
+        model = self.param_selection.get_model()
+        self.param_selection.set_model(None)
+        self.param_selection.set_model(model)
 
     def setup_listitem(self, factory, lsi):
         box = Gtk.Box()
@@ -269,15 +278,18 @@ class Panel (Gtk.Box):
 
     @Gtk.Template.Callback()
     def btn_process_clicked(self,sender):
-        self.stack.set_visible_child_name('预览')
+        self.stack.set_visible_child_name('preview')
         self.box_start.set_visible(True)
         self.box_present.set_visible(False)
         self.box_process.set_visible(False)
-        pass
+        
+        width,height = self.owner.export_svg('a.svg')
+
+        
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
-        self.stack.set_visible_child_name('总览')
+        self.stack.set_visible_child_name('overview')
         self.box_start.set_visible(False)
         self.box_present.set_visible(True)
         self.box_process.set_visible(True)
@@ -303,7 +315,7 @@ class Panel (Gtk.Box):
 
     #     if self.cur_item_index == Gtk.INVALID_LIST_POSITION:
     #         popover.set_menu_model(self.menu_add)
-    #         self.selection_model.unselect_all()
+    #         self.device_selection_model.unselect_all()
     #     else:
     #         popover.set_menu_model(self.menu)
 
@@ -312,13 +324,13 @@ class Panel (Gtk.Box):
     #     rect.y = y
     #     popover.set_pointing_to(rect)
 
-    #     self.selection_model.set_can_unselect(False)
+    #     self.device_selection_model.set_can_unselect(False)
     #     i = self.cur_item_index
 
     #     popover.popup()
 
-    #     self.selection_model.set_selected(i)
-    #     self.selection_model.set_can_unselect(True)
+    #     self.device_selection_model.set_selected(i)
+    #     self.device_selection_model.set_can_unselect(True)
 
     # def set_viewbar(self,viewbar):
     #     self.viewbar = viewbar
@@ -439,8 +451,8 @@ class Panel (Gtk.Box):
     # @Gtk.Template.Callback()
     # def point_size_value_changed(self,spin_button):
     #     value = spin_button.get_value()
-    #     i = self.selection_model.get_selected()
-    #     item = self.selection_model.get_item(i).get_item()
+    #     i = self.device_selection_model.get_selected()
+    #     item = self.device_selection_model.get_item(i).get_item()
     #     item.obj.material.size = value
 
     # @Gtk.Template.Callback()

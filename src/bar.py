@@ -183,9 +183,7 @@ class Hotbar (Gtk.ScrolledWindow):
             except:
                 return
             else:
-                im = Image.open(file_path)
-                image_array = np.array(im.convert('RGBA'))
-                self.owner.add_bitmap(image_array)                    
+                self.owner.add_bitmap(file_path)
                 self.emit('item-added',None)
 
         dialog.open(None, None, open_file) 

@@ -195,21 +195,22 @@ class Label(Element):
         
         self.set_text(text)
 
-    def draw_to_surface(self,surface : cairo.Surface):
-        # 3. 创建最终零留白图片表面
-        ctx = cairo.Context(surface)
+    def draw_to_surface(self,surface : cairo.Surface,cr:cairo.Context):
+        cr.save()
+        if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
+        else: cr.set_source_rgb(0, 0, 1)
 
         # 5. 配置字体（与临时上下文一致，确保尺寸匹配）
-        ctx.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        ctx.set_font_size(self.font_size)
+        cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(self.font_size)
 
         # 7. 绘制文字（黑色，可修改RGB值换颜色）
-        ctx.set_source_rgb(1, 1, 1)
-        ctx.move_to(-self.text_info.x_bearing, -self.text_info.y_bearing)
-        ctx.text_path(self.text)
+        cr.move_to(-self.text_info.x_bearing, -self.text_info.y_bearing)
+        cr.text_path(self.text)
 
-        if self.params['engraving_mode'] == 'fill': ctx.fill()
-        else: ctx.stroke()
+        if self.params['engraving_mode'] == 'fill': cr.fill()
+        else: cr.stroke()
+        cr.restore()
     
     def draw_to_image(self):
         temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1)  # 临时1x1像素表面
@@ -229,9 +230,28 @@ class Label(Element):
         img_height = int(text_height)
 
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
-        self.draw_to_surface(surface)
+        self.draw_to_surface(surface,cairo.Context(surface))
 
         return surface
+
+    def draw_to_svg(self,cr : cairo.Context):
+        cr.save()
+        cr.translate(self.local.x * 1000,-self.local.y * 1000)
+        cr.rotate(-self.local.euler_z)
+        cr.scale(self.local.scale_x,self.local.scale_y)
+
+        if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
+        else: cr.set_source_rgb(0, 0, 1)
+        cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(self.font_size * self.pixelsize_in_mm)
+        text_extents = cr.text_extents(self.text)
+        cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
+        cr.text_path(self.text)
+
+        if self.params['engraving_mode'] == 'fill': cr.fill()
+        else: cr.stroke()
+
+        cr.restore()
     
     def set_text(self,text):
         self.text = text
@@ -240,8 +260,9 @@ class Label(Element):
         argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
         tex = gfx.Texture(argb,dim=2)
         tex_map = gfx.TextureMap(tex)
-        self.width = argb.shape[1] * self.pixelsize_in_mm / 1000
-        self.height = argb.shape[0] * self.pixelsize_in_mm / 1000
+        
+        self.width = surface.get_width() * self.pixelsize_in_mm / 1000
+        self.height = surface.get_height() * self.pixelsize_in_mm / 1000
         
         self.remove(self.obj)
         self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
@@ -252,39 +273,64 @@ class Label(Element):
         self.set_text(self.text)
 
 class Bitmap(Element):
-    def __init__(self,pixelsize,im,*args,**kwargs):
+    def __init__(self,filepath,pixelsize,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.pixelsize_in_mm = pixelsize
+        self.params['engraving_mode'] = 'fill'
 
-        self.height = im.shape[0] * pixelsize / 1000
-        self.width = im.shape[1] * pixelsize / 1000
-        tex = gfx.Texture(im,dim=2)
+        self.filepath = filepath
+        im = Image.open(filepath)
+        im = im.convert('RGBA')
+        self.im = im
+
+        self.phys_width = im.size[0] * pixelsize / 1000
+        self.phys_height = im.size[1] * pixelsize / 1000
+        
+        tex = gfx.Texture(np.asarray(im),dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.phys_width,self.phys_height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(self.obj)
  
-        self.im = im
         self.draw_to_image()
 
     def get_image(self):
         return self.im.astype(np.uint8)
     
     def draw_to_surface(self,surface : cairo.Surface):
-        img_h, img_w, _ = self.im.shape
+        pixel_width,pixel_height = self.im.size
 
         ctx = cairo.Context(surface)
-        stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, img_w)
-        surface_im = cairo.ImageSurface.create_for_data(self.im[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, img_w, img_h, stride)
+        stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
+        surface_im = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
         ctx.set_source_surface(surface_im, 0, 0)
         ctx.paint()
 
     def draw_to_image(self):
-        img_width = self.im.shape[1]
-        img_height = self.im.shape[0]
-
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
+        pixel_width,pixel_height = self.im.size
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, pixel_width, pixel_height)
         self.draw_to_surface(surface)
         return surface
+    
+    def draw_to_svg(self,cr : cairo.Context):
+        cr.save()
+
+        pixel_width,pixel_height = self.im.size
+        phys_width = pixel_width * self.pixelsize_in_mm
+        phys_height = pixel_height * self.pixelsize_in_mm
+        pixel_width = int(phys_width * self.local.scale_x / self.pixelsize_in_mm)
+        pixel_height = int(phys_height * self.local.scale_y / self.pixelsize_in_mm)
+        im = self.im.resize((pixel_width,pixel_height))
+        cr.translate(self.local.x * 1000,-self.local.y * 1000)
+        cr.rotate(-self.local.euler_z)
+        cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+
+        stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
+        surface = cairo.ImageSurface.create_for_data(np.asarray(im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
+        cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
+        cr.paint()
+
+        cr.restore()
+        pass
     
 class Vectors(Element):
     def __init__(self,lines,pixelsize,*args,**kwargs):
@@ -304,28 +350,29 @@ class Vectors(Element):
             line = np.array(line)[:,[0,1]]
             line = line - [min_x + self.width/2,min_y + self.height/2]
             line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))            # print(line)
-            line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color='yellow',depth_test=False))
+            line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color=self.params['light_source'],depth_test=False))
             self.lines.append(line)
             self.obj.add(line)
         self.add(self.obj)
 
     def draw_to_surface(self,surface : cairo.Surface):
-        ctx = cairo.Context(surface)
-        ctx.set_source_rgba(1,1,0,1)
-        ctx.translate(surface.get_width()/2,surface.get_height()/2)
+        cr = cairo.Context(surface)
+        if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
+        else: cr.set_source_rgb(0, 0, 1)
+        
+        cr.translate(surface.get_width()/2,surface.get_height()/2)
+        cr.rotate(-self.local.euler_z)
         for line in self.lines:
             start = line.geometry.positions.data[0]
-            start = start * self.local.scale_x * 1000 / self.pixelsize_in_mm
-            ctx.move_to(start[0],-start[1])
+            start = start * 1000 / self.pixelsize_in_mm * self.local.scale[:1]
+            cr.move_to(start[0],-start[1])
             for end in line.geometry.positions.data[1:]:
-                end = end * self.local.scale_x * 1000 / self.pixelsize_in_mm
-                ctx.line_to(end[0],-end[1])
-            ctx.close_path()
+                end = end * 1000 / self.pixelsize_in_mm * self.local.scale[:1]
+                cr.line_to(end[0],-end[1])
+            cr.close_path()
 
-            if self.params['engraving_mode'] == 'fill': 
-                ctx.fill()
-            else: 
-                ctx.stroke()
+            if self.params['engraving_mode'] == 'fill': cr.fill()
+            else: cr.stroke()
 
     def draw_to_image(self):
         phy_width = int(self.width * self.local.scale_x * 1000)
@@ -335,6 +382,27 @@ class Vectors(Element):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
         self.draw_to_surface(surface)
         return surface
+    
+    def draw_to_svg(self,cr : cairo.Context):
+        cr.save()
+
+        cr.translate(self.local.x * 1000,-self.local.y * 1000)
+        cr.rotate(-self.local.euler_z)
+        if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
+        else: cr.set_source_rgb(0, 0, 1)
+
+        for line in self.lines:
+            start = line.geometry.positions.data[0]
+            start = start * 1000 * self.local.scale[:1]
+            cr.move_to(start[0],-start[1])
+            for end in line.geometry.positions.data[1:]:
+                end = end * 1000 * self.local.scale[:1]
+                cr.line_to(end[0],-end[1])
+            cr.close_path()
+
+            if self.params['engraving_mode'] == 'fill': cr.fill()
+            else: cr.stroke()
+        cr.restore()
 
     def set_engraving_mode(self,mode : str):
         self.params['engraving_mode'] = mode
@@ -479,6 +547,8 @@ class Engravtor(gfx.WorldObject):
     def set_consumable(self,name):
         target : gfx.WorldObject = next(self.scene.iter(lambda o: o.name == name))
         target.material.pick_write = True
+        target.material.depth_test = False
+        target.render_order = 0
         target.cast_shadow = True
         target.receive_shadow=True
         target.local.position = self.target_area.local.position
@@ -509,12 +579,12 @@ class Engravtor(gfx.WorldObject):
         element.local.z = target_height
         self.target_area.add(element)
 
-    def add_bitmap(self,im):
+    def add_bitmap(self,filepath):
         target = self.target
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
-        element = Bitmap(self.pixelsize_in_mm,im,name='图片')
-        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
+        element = Bitmap(filepath,self.pixelsize_in_mm,name='图片')
+        scale = min(self.x_lim[1] / element.phys_width,self.y_lim[1] / element.phys_height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
         self.target_area.add(element)
@@ -534,51 +604,15 @@ class Engravtor(gfx.WorldObject):
         import cairo
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
         height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
- 
+
         with cairo.SVGSurface(file_name, width, height) as surface:
             cr = cairo.Context(surface)
-            cr.save()
+            cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize_in_mm)
             cr.translate(width / 2,height / 2)
             for obj in self.target_area.children:
-                if type(obj) == Label:
-                    obj : Label
-                    cr.set_source_rgb(1, 0, 0)
-                    cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize_in_mm)
-                    cr.set_font_size(obj.font_size * 1000)
-                    cr.select_font_face(obj.family)
-                    ascent, descent, font_height, max_x_advance, max_y_advance = cr.font_extents()
-                    text_extents = cr.text_extents(obj.text)
-                    xoffset = 0.
-                    yoffset = 0.
-                    cr.move_to(obj.local.x * 1000,  
-                                -(obj.local.y * 1000))
-
-                    cr.text_path(obj.text)
-                    cr.stroke()
-                    
-                elif type(obj) == Bitmap:
-                    obj : Bitmap
-                    aabb = obj.get_bounding_box()
-                    width = int((aabb[1][0] - aabb[0][0]) * 1000 / self.pixelsize_in_mm)
-                    height = int((aabb[1][1] - aabb[0][1]) * 1000 / self.pixelsize_in_mm)
-
-                    image = Image.fromarray(obj.get_image())
-                    image = image.resize((width,height),resample=Image.Resampling.NEAREST)
-                    image = image.convert('RGBA')
-                    rgba_array = np.array(image)
-                    
-                    image_surface = cairo.ImageSurface.create_for_data(rgba_array.data,cairo.Format.ARGB32,width,height)
-
-                    cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
-                    cr.set_source_surface(image_surface, 
-                        obj.local.x * 1000 / self.pixelsize_in_mm - image_surface.get_width() / 2, 
-                        -(obj.local.y * 1000 / self.pixelsize_in_mm + image_surface.get_height() / 2))
-                
-                    cr.paint()
-                else:
-                    pass
-            cr.restore()
-
+                if Element not in obj.__class__.__mro__: continue
+                obj : Label | Bitmap | Vectors
+                obj.draw_to_svg(cr)
         return width,height
     
     def excute(self,line : str):
