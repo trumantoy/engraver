@@ -388,16 +388,16 @@ class Vectors(Element):
 
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
+        # cr.scale(1,1) 
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
-
         for line in self.lines:
             start = line.geometry.positions.data[0]
-            start = start * 1000 * self.local.scale[:1]
-            cr.move_to(start[0],-start[1])
+            start = start * self.local.scale[:1]
+            cr.move_to(start[0] * 1000,-start[1] * 1000)
             for end in line.geometry.positions.data[1:]:
-                end = end * 1000 * self.local.scale[:1]
-                cr.line_to(end[0],-end[1])
+                end = end * self.local.scale[:1]
+                cr.line_to(end[0] * 1000,-end[1] * 1000)
             cr.close_path()
 
             if self.params['engraving_mode'] == 'fill': cr.fill()
