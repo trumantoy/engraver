@@ -365,7 +365,6 @@ class Vectors(Element):
         else: cr.set_source_rgb(0, 0, 1)
         
         cr.translate(surface.get_width()/2,surface.get_height()/2)
-        cr.rotate(-self.local.euler_z)
         for line in self.lines:
             start = line.geometry.positions.data[0]
             start = start * 1000 / self.pixelsize_in_mm * self.local.scale[:1]
@@ -392,7 +391,6 @@ class Vectors(Element):
 
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        cr.scale(1,1)
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
 
@@ -402,6 +400,7 @@ class Vectors(Element):
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
         else: 
+            cr.scale(1,1)
             for line in self.lines:
                 start = line.geometry.positions.data[0]
                 start = start * self.local.scale[:1]
