@@ -195,7 +195,7 @@ class Label(Element):
         
         self.set_text(text)
 
-    def draw_to_surface(self,surface : cairo.Surface,cr:cairo.Context):
+    def draw_to_surface(self,cr:cairo.Context):
         cr.save()
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
@@ -230,7 +230,7 @@ class Label(Element):
         img_height = int(text_height)
 
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
-        self.draw_to_surface(surface,cairo.Context(surface))
+        self.draw_to_surface(cairo.Context(surface))
 
         return surface
 
@@ -238,18 +238,23 @@ class Label(Element):
         cr.save()
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        cr.scale(self.local.scale_x,self.local.scale_y)
 
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
-        cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(self.font_size * self.pixelsize_in_mm)
-        text_extents = cr.text_extents(self.text)
-        cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
-        cr.text_path(self.text)
 
-        if self.params['engraving_mode'] == 'fill': cr.fill()
-        else: cr.stroke()
+        if self.params['engraving_mode'] == 'fill': 
+            cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+            surface = self.draw_to_image()
+            cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
+            cr.paint()
+        else: 
+            cr.scale(self.local.scale_x,self.local.scale_y)
+            cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            cr.set_font_size(self.font_size * self.pixelsize_in_mm)
+            text_extents = cr.text_extents(self.text)
+            cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
+            cr.text_path(self.text)
+            cr.stroke()
 
         cr.restore()
     
@@ -257,8 +262,8 @@ class Label(Element):
         self.text = text
         
         surface = self.draw_to_image()
-        argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
-        tex = gfx.Texture(argb,dim=2)
+        im = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
+        tex = gfx.Texture(im[...,[2,1,0,3]],dim=2)
         tex_map = gfx.TextureMap(tex)
         
         self.width = surface.get_width() * self.pixelsize_in_mm / 1000
@@ -323,7 +328,6 @@ class Bitmap(Element):
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
         cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
-
         stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
         surface = cairo.ImageSurface.create_for_data(np.asarray(im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
         cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
@@ -349,7 +353,7 @@ class Vectors(Element):
         for line in lines:
             line = np.array(line)[:,[0,1]]
             line = line - [min_x + self.width/2,min_y + self.height/2]
-            line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))            # print(line)
+            line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))
             line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color=self.params['light_source'],depth_test=False))
             self.lines.append(line)
             self.obj.add(line)
@@ -374,7 +378,7 @@ class Vectors(Element):
             if self.params['engraving_mode'] == 'fill': cr.fill()
             else: cr.stroke()
 
-    def draw_to_image(self):
+    def draw_to_image(self) -> cairo.ImageSurface:
         phy_width = int(self.width * self.local.scale_x * 1000)
         phy_height = int(self.height * self.local.scale_x * 1000)
         img_width = int(phy_width / self.pixelsize_in_mm)
@@ -388,20 +392,25 @@ class Vectors(Element):
 
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        # cr.scale(1,1) 
+        cr.scale(1,1)
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
-        for line in self.lines:
-            start = line.geometry.positions.data[0]
-            start = start * self.local.scale[:1]
-            cr.move_to(start[0] * 1000,-start[1] * 1000)
-            for end in line.geometry.positions.data[1:]:
-                end = end * self.local.scale[:1]
-                cr.line_to(end[0] * 1000,-end[1] * 1000)
-            cr.close_path()
 
-            if self.params['engraving_mode'] == 'fill': cr.fill()
-            else: cr.stroke()
+        if self.params['engraving_mode'] == 'fill': 
+            surface = self.draw_to_image()
+            cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+            cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
+            cr.paint()
+        else: 
+            for line in self.lines:
+                start = line.geometry.positions.data[0]
+                start = start * self.local.scale[:1]
+                cr.move_to(start[0] * 1000,-start[1] * 1000)
+                for end in line.geometry.positions.data[1:]:
+                    end = end * self.local.scale[:1]
+                    cr.line_to(end[0] * 1000,-end[1] * 1000)
+                cr.close_path()
+            cr.stroke()
         cr.restore()
 
     def set_engraving_mode(self,mode : str):
