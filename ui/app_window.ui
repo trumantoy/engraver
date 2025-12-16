@@ -127,6 +127,16 @@
                 <property name="opacity">0.8</property>
               </object>
             </child>
+
+            <child type="overlay">
+              <object class="Statusbar" id="statusbar">
+                <property name="halign">center</property>
+                <property name="valign">end</property>
+                <property name="visible">True</property>
+                <property name="opacity">0.8</property>
+                <property name="transition-type">slide-down</property>
+              </object>
+            </child>
           </object>
         </child>
             

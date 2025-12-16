@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <template class="Statusbar" parent="GtkRevealer">
+        <style><class name="statusbar"/></style>
+        <child>
+            <object class="GtkLabel" id="info">
+                <property name="label">&lt;span weight="bold" size="large"&gt;文本&lt;/span&gt;</property>
+                <property name="use-markup">True</property>
+            </object>
+        </child>
+    </template>
+</interface>

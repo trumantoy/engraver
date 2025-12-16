@@ -32,6 +32,7 @@ class AppWindow (Gtk.ApplicationWindow):
     actionbar : Actionbar = Gtk.Template.Child('actionbar')
     hotbar : Hotbar = Gtk.Template.Child('hotbar')
     propbar : Propbar = Gtk.Template.Child('propbar')
+    statusbar : Gtk.Revealer = Gtk.Template.Child('statusbar')
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
@@ -99,11 +100,12 @@ class AppWindow (Gtk.ApplicationWindow):
         self.tool.selected_func = self.selected_func
         self.tool.transformed_func = self.transformed_func
         self.propbar.connect('item-removed', self.item_removed)
-        self.panel.connect('presented', self.presented)
+        self.panel.connect('presented', self.processed)
         self.panel.connect('rested', self.rested)
+        self.panel.connect('processed', self.processed)
         self.panel.add_device(self.tool)
 
-        GLib.timeout_add(1000/180,lambda: self.editor.step(1/10) or True)
+        GLib.timeout_add(1000/180,lambda: self.editor.step(1/60) or True)
 
     def do_size_allocate(self, width: int, height: int, baseline: int):
         if hasattr(self,'prev_width'): 
@@ -158,9 +160,9 @@ class AppWindow (Gtk.ApplicationWindow):
         self.panel.set_obj(None)
         self.panel.set_params(self.tool.get_items())
 
-    def presented(self,sender,gcode):
-        if 1 < len(self.tool.steps): return
-        self.tool.excute(gcode)
+    def processed(self,sender,gcode):
+        if len(self.tool.steps) == 0:
+            self.tool.excute(gcode)
     
     def rested(self,sender,*args):
         self.tool.excute('G0\n')

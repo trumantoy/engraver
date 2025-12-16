@@ -278,32 +278,40 @@ class Panel (Gtk.Box):
             sender.set_label('走边框')
             self.emit('rested',None)
 
+    @GObject.Signal(return_type=bool, arg_types=(object,))
+    def processed(self,*args): 
+        pass
+
     @Gtk.Template.Callback()
     def btn_process_clicked(self,sender):
+        if 0 == self.owner.count_elements():
+            return
+
         self.stack.set_visible_child_name('preview')
         self.box_start.set_visible(True)
         self.box_present.set_visible(False)
         self.box_process.set_visible(False)
 
-        import tempfile
-        temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
-        svg_filepath = temp_file.name + '.svg'
-        gc_filepath = temp_file.name + '.gc'
-        print(svg_filepath,gc_filepath)
+        for svg,width,height,params in self.owner.export_svg():            
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
+            svg_filepath = temp_file.name + '.svg'
+            gc_filepath = temp_file.name + '.gc'
+            print(svg_filepath)
 
-        from io import BytesIO
-        with open(svg_filepath,'w') as f:
-            svg = BytesIO()
-            width,height = self.owner.export_svg(svg)
-            f.write(self.parse_svg(svg.getvalue().decode()))
+            with open(svg_filepath,'w') as f:
+                f.write(self.parse_svg(svg.getvalue().decode()))
+            
+            if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize']):
+                continue
+            
+            with open(gc_filepath,'r') as f:
+                gcode = f.read()
+                buffer = self.textview_gcode.get_buffer()
+                start_iter = buffer.get_start_iter()
+                end_iter = buffer.get_end_iter()
+                buffer.insert(end_iter, gcode)
 
-        if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height):
-            return
-
-        with open(gc_filepath,'r') as f:
-            gcode = f.read()
-            self.textview_gcode.get_buffer().set_text(gcode)
-        
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
@@ -315,7 +323,11 @@ class Panel (Gtk.Box):
 
     @Gtk.Template.Callback()
     def btn_start_clicked(self,sender):
-        pass
+        buffer = self.textview_gcode.get_buffer()
+        start_iter = buffer.get_start_iter()
+        end_iter = buffer.get_end_iter()
+        gcode = buffer.get_text(start_iter, end_iter, True)
+        self.emit('processed', gcode)
         
     def parse_svg(self,svg_content):
         from lxml import etree
@@ -362,7 +374,7 @@ class Panel (Gtk.Box):
         ).decode("utf-8")
         return result
 
-    def export_gcode_from_svg(self,svg_filepath,gc_filepath,width,height,power=100,speed=100,pixelsize=0.1):
+    def export_gcode_from_svg(self,svg_filepath,gc_filepath,width,height,power,speed,pixelsize):
         from svg2gcode.__main__ import svg2gcode
         from svg2gcode.svg_to_gcode import css_color
         import argparse
@@ -420,7 +432,7 @@ class Panel (Gtk.Box):
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + '3.3.6', help="show version number and exit")
 
         # 使用临时文件作为输出路径
-        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--imagepower','100','--imagespeed','100', '--pixelsize','0.1'])
+        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--imagepower',str(power),'--imagespeed',str(speed), '--pixelsize',str(pixelsize)])
         
         if args.color_coded != "":
             if args.pathcut:

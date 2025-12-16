@@ -58,7 +58,7 @@ class Editor(gfx.Scene):
         self.add(light)
         
         
-    def step(self,dt=1/240):
+    def step(self,dt=1/180):
         if self.steps:
             self.steps[0]()
             self.steps.pop(0)

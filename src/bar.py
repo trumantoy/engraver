@@ -270,3 +270,22 @@ class Propbar (Gtk.ScrolledWindow):
 
         self.stack.set_visible_child_name(obj.__class__.__name__)
 
+@Gtk.Template(filename='ui/statusbar.ui')
+class Statusbar (Gtk.Revealer):
+    __gtype_name__ = "Statusbar"
+
+    label = Gtk.Template.Child('info')
+    
+    def __init__(self):
+        provider = Gtk.CssProvider.new()
+        provider.load_from_path('ui/statusbar.css')
+        Gtk.StyleContext.add_provider_for_display(self.get_display(),provider,Gtk.STYLE_PROVIDER_PRIORITY_USER)
+
+        self.set_transition_type(Gtk.RevealerTransitionType.CROSSFADE)
+        self.set_transition_duration(200)
+
+    def set_status(self,status):
+        self.label.set_text(status)
+        self.set_reveal_child(True)
+
+    

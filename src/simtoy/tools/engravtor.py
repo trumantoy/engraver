@@ -156,6 +156,7 @@ class Element(gfx.WorldObject):
         self.params['light_source'] = 'red'
         self.params['power'] = 100
         self.params['speed'] = 100
+        self.params['pixelsize'] = 0.1
         self.obj = None
 
     def get_geometry_bounding_box(self):
@@ -243,7 +244,8 @@ class Label(Element):
         else: cr.set_source_rgb(0, 0, 1)
 
         if self.params['engraving_mode'] == 'fill': 
-            cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+            self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
+            cr.scale(self.pixelsize_in_mm*self.local.scale_x,self.pixelsize_in_mm*self.local.scale_y)
             surface = self.draw_to_image()
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
@@ -256,8 +258,9 @@ class Label(Element):
             cr.text_path(self.text)
             cr.stroke()
 
+
         cr.restore()
-    
+
     def set_text(self,text):
         self.text = text
         
@@ -320,19 +323,15 @@ class Bitmap(Element):
         cr.save()
 
         pixel_width,pixel_height = self.im.size
-        phys_width = pixel_width * self.pixelsize_in_mm
-        phys_height = pixel_height * self.pixelsize_in_mm
-        pixel_width = int(phys_width * self.local.scale_x / self.pixelsize_in_mm)
-        pixel_height = int(phys_height * self.local.scale_y / self.pixelsize_in_mm)
-        im = self.im.resize((pixel_width,pixel_height))
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+        cr.scale(self.pixelsize_in_mm*self.local.scale_x,self.pixelsize_in_mm*self.local.scale_y)
         stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
-        surface = cairo.ImageSurface.create_for_data(np.asarray(im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
+        surface = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
         cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
         cr.paint()
 
+        self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
         cr.restore()
         pass
     
@@ -410,6 +409,8 @@ class Vectors(Element):
                     cr.line_to(end[0] * 1000,-end[1] * 1000)
                 cr.close_path()
             cr.stroke()
+
+        self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
         cr.restore()
 
     def set_engraving_mode(self,mode : str):
@@ -453,11 +454,12 @@ class Engravtor(gfx.WorldObject):
         persp_camera.show_pos(self.target_area.world.position,up=[0,0,1],depth=1.0)
         self.persp_camera = persp_camera
         
-        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize_in_mm * 2/1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
+        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize_in_mm /1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
         self.focus.render_order = 1
         self.target_area.add(self.focus)
 
         self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize_in_mm/1000,thickness_space='world',color=(1, 0, 0, 0)))
+        self.laser.render_order = 1
         self.target_area.add(self.laser)
 
         self.add_event_handler(self._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
@@ -539,12 +541,11 @@ class Engravtor(gfx.WorldObject):
 
     def init_params(self):
         self.y_lim = self.x_lim = (0,0.100)
-        self.light_spot_size = 0.0000075
+        self.light_spot_size = 0.0075
         self.pixelsize_in_mm = 0.1
         self.paths = list()
         self.speed = 100
         self.power = 0
-        self.pos = (0,0,0)
 
     def get_view_focus(self):
         return self.camera.local.position,self.target_area.local.position
@@ -555,8 +556,8 @@ class Engravtor(gfx.WorldObject):
     def set_consumable(self,name):
         target : gfx.WorldObject = next(self.scene.iter(lambda o: o.name == name))
         target.material.pick_write = True
-        target.material.depth_test = False
-        target.render_order = 0
+        # target.material.depth_test = False
+        # target.render_order = 
         target.cast_shadow = True
         target.receive_shadow=True
         target.local.position = self.target_area.local.position
@@ -608,43 +609,64 @@ class Engravtor(gfx.WorldObject):
         element.local.z = target_height
         self.target_area.add(element)
 
-    def export_svg(self,file_name):
-        import cairo
+    def count_elements(self):
+        i = 0
+        for obj in self.target_area.children:
+            if Element not in obj.__class__.__mro__: continue
+            obj : Label | Bitmap | Vectors
+            i+=1
+        return i
+
+    def export_svg(self):
+        from io import BytesIO
+        import cairo    
+        svgs = []
+
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
         height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
+        for obj in self.target_area.children:
+            if Element not in obj.__class__.__mro__: continue
+            obj : Label | Bitmap | Vectors
 
-        with cairo.SVGSurface(file_name, width, height) as surface:
-            cr = cairo.Context(surface)
-            cr.set_line_width(self.light_spot_size * 1000 / self.pixelsize_in_mm)
-            cr.translate(width / 2,height / 2)
-            for obj in self.target_area.children:
-                if Element not in obj.__class__.__mro__: continue
-                obj : Label | Bitmap | Vectors
+            svg = BytesIO()
+            with cairo.SVGSurface(svg, width, height) as surface:
+                cr = cairo.Context(surface)
+                cr.set_line_width(self.light_spot_size)
+                cr.translate(width / 2,height / 2)
                 obj.draw_to_svg(cr)
-        return width,height
+
+            svgs.append((svg,width,height,obj.params))
+        return svgs
     
-    def excute(self,line : str):
-        lines = line.split('\n')
-        for line in lines:
-            if not line or line.startswith(';'): continue
+    def excute(self,lines : str):
+        while lines:
+            line_index = lines.find('\n')
+            line = lines[:line_index+1].strip()
+            lines = lines[line_index+1:]
+
+            if not line or line.startswith(';'): 
+                continue
+
+            # print(line)
             moveable = False
-            x = None
-            y = None
+            x,y = self.focus.local.position[:2] * 1000
             power = self.power
             speed = self.speed
-            print(line)
             command = line.split(' ')
             for param in command:
                 if param == 'G0':
                     moveable = True
                     x = 0
                     y = 0
+                    power = 0
                 elif param == 'M3':
-                    power = self.power
+                    self.laser.material.color = (1,0,0,power / 100)
+                    continue
                 elif param == 'G1': 
                     moveable = True
                 elif param == 'M5':
-                    power = 0
+                    self.laser.material.color = (1,0,0,0)
+                    continue
                 elif param.startswith('X'):
                     x = float(param[1:])
                     moveable = True
@@ -652,80 +674,94 @@ class Engravtor(gfx.WorldObject):
                     y = float(param[1:])
                     moveable = True
                 elif param.startswith('F'):
-                    speed = float(param[1:])
+                    self.speed = speed = float(param[1:])
                 elif param.startswith('S'):
-                    power = float(param[1:])
+                    self.power = power = float(param[1:])
+                    self.laser.material.color = (1,0,0,power / 100)
+                elif param == 'M2':
+                    self.focus.local.x = 0
+                    self.focus.local.y = 0
+                    self.laser.material.color = (1,0,0,0)
+                    self.laser.geometry.positions.data[1] = self.focus.local.position
+                    self.laser.geometry.positions.update_full()
+                    continue
                 else:
                     pass
-                
-            if moveable:
-                def make_f(*args):
-                    return lambda dt: self.move(dt,*args)
-                self.steps.append(make_f(x,y,speed))
 
-                self.laser.material.color = (1,0,0,power / 100)
-                self.laser.geometry.update()
+            def f(dt):
+                if moveable:
+                    self.move(x,y,speed,power,dt)
+                self.excute(lines)
+            self.steps.append(f)
+            break
 
-            self.power = power
-            self.speed = speed
-
-    def move(self,dt,x,y,speed):
+    def move(self,x,y,speed,power,dt):
         start = self.focus.local.position[:2] * 1000
         end = np.array([x,y])
         dir = end - start
         S = np.linalg.norm(dir)
-        dir /= S
 
-        v_max=100; v0=0; v1=0; a=100
+        if False and S > 0: 
+            dir /= S
+            v_max=speed*10; v0=0; v1=0; a=speed*10
+            # 加速阶段：从v0到v_max
+            t1 = (v_max - v0) / a  # 加速时间
+            s1 = v0 * t1 + 0.5 * a * t1**2  # 加速距离
+                
+            # 减速阶段：从v_max到v1
+            t3 = (v_max - v1) / a  # 减速时间
+            s3 = v_max * t3 - 0.5 * a * t3**2  # 减速距离
 
-        # 加速阶段：从v0到v_max
-        t1 = (v_max - v0) / a  # 加速时间
-        s1 = v0 * t1 + 0.5 * a * t1**2  # 加速距离
+            # 匀速阶段：总距离 - 加速距离 - 减速距离
+            s2 = S - s1 - s3
+
+            if s2 < 0:
+                total_v_sq = a * S
+                v_peak = np.sqrt(total_v_sq)  # 三角加速的速度峰值
+                t1 = v_peak / a  # 加速时间 = 减速时间
+                t3 = t1
+                s1 = 0.5 * a * t1**2
+                s3 = s1
+                s2 = 0  # 无匀速阶段
+                v_max = v_peak  # 更新实际峰值速度
             
-        # 减速阶段：从v_max到v1
-        t3 = (v_max - v1) / a  # 减速时间
-        s3 = v_max * t3 - 0.5 * a * t3**2  # 减速距离
+            t2 = s2 / v_max if v_max != 0 else 0  # 匀速时间
+            total_time = t1 + t2 + t3  # 总运动时间
 
-        # 匀速阶段：总距离 - 加速距离 - 减速距离
-        s2 = S - s1 - s3
+            t = np.linspace(0, total_time, round(total_time / dt))
 
-        if s2 < 0:
-            total_v_sq = a * S
-            v_peak = np.sqrt(total_v_sq)  # 三角加速的速度峰值
-            t1 = v_peak / a  # 加速时间 = 减速时间
-            t3 = t1
-            s1 = 0.5 * a * t1**2
-            s3 = s1
-            s2 = 0  # 无匀速阶段
-            v_max = v_peak  # 更新实际峰值速度
-        
-        t2 = s2 / v_max if v_max != 0 else 0  # 匀速时间
-        total_time = t1 + t2 + t3  # 总运动时间
+            for ti in t:
+                if ti <= t1:
+                    s = v0 * ti + 0.5 * a * ti**2
+                elif ti <= t1 + t2:
+                    s = s1 + v_max * (ti - t1)
+                else:
+                    delta_t = ti - (t1 + t2)
+                    s = s1 + s2 + v_max * delta_t - 0.5 * a * delta_t**2
 
-        t = np.linspace(0, total_time, round(total_time / dt))
+                xy = start + dir * s
 
-        delta_move = []
-
-        for ti in t:
-            if ti <= t1:
-                s = v0 * ti + 0.5 * a * ti**2
-            elif ti <= t1 + t2:
-                s = s1 + v_max * (ti - t1)
-            else:
-                delta_t = ti - (t1 + t2)
-                s = s1 + s2 + v_max * delta_t - 0.5 * a * delta_t**2
-
-            xy = start + dir * s
-
-            def make_f(x,y):
+                def make_f(x,y,power):
+                    def f(dt):
+                        self.focus.local.x = x / 1000
+                        self.focus.local.y = y / 1000
+                        self.laser.material.color = (1,0,0,power / 100)
+                        self.laser.geometry.positions.data[1] = self.focus.local.position
+                        self.laser.geometry.positions.update_full()
+                    return f
+                    
+                self.steps.append(make_f(xy[0],xy[1],power))
+        else:
+            def make_f(x,y,power):
                 def f(dt):
-                    self.focus.local.x = x
-                    self.focus.local.y = y
+                    self.focus.local.x = x / 1000
+                    self.focus.local.y = y / 1000
+                    self.laser.material.color = (1,0,0,power / 100)
                     self.laser.geometry.positions.data[1] = self.focus.local.position
                     self.laser.geometry.positions.update_full()
                 return f
                 
-            delta_move.append(make_f(xy[0]/1000,xy[1]/1000))
-        self.steps[0:0] = delta_move
-        
+            self.steps.append(make_f(x,y,power))
+
+
     def is_connected(self): return True

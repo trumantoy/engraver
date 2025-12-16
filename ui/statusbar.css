@@ -1,0 +1,5 @@
+.statusbar {
+    background-color: @theme_bg_color;
+    border-radius: 1mm; 
+    padding: 1mm;
+}
