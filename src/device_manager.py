@@ -1,6 +1,6 @@
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import GLib, Gtk, Gio
+from gi.repository import GLib, Gtk, GObject, Gio, Gdk
 
 import subprocess as sp
 import numpy as np
@@ -45,7 +45,11 @@ class DeviceManagerDialog (Gtk.Window):
         dlg.present()
 
     def device_discovery_closed(self, dlg):
-        return
-    
-    def add_device(self, device):
-        self.lsv_devices.get_model().append(device)
+        if dlg.result:
+            self.add_device(dlg.result)
+   
+    def add_device(self, controller):
+        device_selection = self.lsv_devices.get_model()
+        device = GObject.Object()
+        device.controller = controller
+        device_selection.get_model().append(device)

@@ -18,7 +18,11 @@ class USBController:
     def __init__(self):
         self.serial = None
         self.name = ''
-        
+        self.steps = []
+        threading.Thread(target=self.worker,daemon=True).start()
+        self.mutex = threading.Lock()
+        self.event = threading.Event()
+    
     def connect(self,port):
         try:
             # 初始化串口（根据实际设备修改参数）
@@ -40,18 +44,24 @@ class USBController:
 
     def is_connected(self):
         if not self.serial: return False
-        self.serial.write('$I\n')
-        res = self.serial.readlines(2)
-        response = res.decode().strip()
         
-        if '[MODEL:' in response:
-            model_start = response.find('[MODEL:') + len('[MODEL:')
-            model_end = response.find(']', model_start)
+        try:
+            self.serial.write(b'$I\n')
+            res = self.serial.readall().decode()
+            print(res)
+            
+            if '[MODEL:' not in res:
+                return False
+
+            model_start = res.find('[MODEL:') + len('[MODEL:')
+            model_end = res.find(']', model_start)
             if model_start > 0 and model_end > model_start:
-                self.name = response[model_start:model_end]
-
-        return bool(self.name)
-
+                self.name = res[model_start:model_end]
+        except:
+            return False
+        
+        return True
+    
     def set_axes_invert(self):
         req = f'$240P2P6P5\n'.encode()
         self.serial.write(req)
@@ -62,14 +72,28 @@ class USBController:
         self.serial.write(req)
         res = self.serial.readline()
     
-    def excute(self, lines):
-        for line in lines:
-            req = f'{line}\n'.encode()
-            self.serial.write(req)
+    def excute(self, gcode:str):
+        for line in gcode.splitlines(True):
+            if not line or line.startswith(';'): continue
+            req = line.encode()
+            self.steps.append(req)
+            print(req)
         
-        for _ in range(len(lines)):
-            self.serial.readline()
-    
+        self.event.set()
+            
+    def worker(self):
+        limit = 100
+        sent = 0
+        while True:
+            self.event.wait()
+
+            for i in range(len(self.steps)):
+                req = self.steps.pop(0)
+                self.serial.write(req)
+                sent += 1
+                if sent > limit: sent -= len(self.serial.readlines())
+            
+
     def get_queue_size(self):
         req = '%\n'.encode()
         self.serial.write(req)
@@ -115,18 +139,22 @@ class DeviceDiscoveryDialog (Gtk.Window):
     def btn_usb_add_clicked(self, sender):
         model = self.lsv_usb_list.get_model()
         item = model.get_selected_item()
-        if item: self.result = item
+        if item: self.result = item.controller
         self.close()
 
     @Gtk.Template.Callback()
     def btn_usb_refresh_clicked(self, sender):
-        import serial.tools.list_ports
-        ports = serial.tools.list_ports.comports()
-        for port in [port.device for port in ports]:
-            controller = USBController()
-            if not controller.connect(port): continue
-            controller.set_axes_invert()
-            controller.set_process_params()
-            device = GObject.Object()
-            device.controller = controller
-            self.selection.get_model().append(device)
+        def f():
+            import serial.tools.list_ports
+            ports = serial.tools.list_ports.comports()
+            for port in [port.device for port in ports]:
+                controller = USBController()
+                if not controller.connect(port): continue
+                controller.set_axes_invert()
+                controller.set_process_params()
+                device = GObject.Object()
+                device.controller = controller
+                GLib.idle_add(lambda: self.selection.get_model().append(device))
+
+        threading.Thread(target=f,daemon=True).start()
+

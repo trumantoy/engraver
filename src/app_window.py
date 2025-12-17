@@ -100,10 +100,8 @@ class AppWindow (Gtk.ApplicationWindow):
         self.tool.selected_func = self.selected_func
         self.tool.transformed_func = self.transformed_func
         self.propbar.connect('item-removed', self.item_removed)
-        self.panel.connect('presented', self.processed)
-        self.panel.connect('rested', self.rested)
-        self.panel.connect('processed', self.processed)
-        self.panel.add_device(self.tool)
+        # self.panel.add_device(self.tool)
+        self.panel.connect('preview', self.preview)
 
         GLib.timeout_add(1000/180,lambda: self.editor.step(1/60) or True)
 
@@ -160,12 +158,17 @@ class AppWindow (Gtk.ApplicationWindow):
         self.panel.set_obj(None)
         self.panel.set_params(self.tool.get_items())
 
-    def processed(self,sender,gcode):
-        if len(self.tool.steps) == 0:
-            self.tool.excute(gcode)
-    
-    def rested(self,sender,*args):
-        self.tool.excute('G0\n')
+    def preview(self,sender,gcode):
+        self.tool.target_area.remove(self.tool.transform_helper)
+        self.tool.transform_helper = None
+
+        if gcode:
+            self.propbar.set_visible(False)
+            self.hotbar.set_visible(False)
+            self.tool.remove_event_handler(self.tool._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
+        else:
+            self.hotbar.set_visible(True)
+            self.tool.add_event_handler(self.tool._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
 
     def file_import(self, sender, args):
         dialog = Gtk.FileDialog()

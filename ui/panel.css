@@ -14,3 +14,20 @@
 .green-btn:active {
   background-color: green;
 }
+
+.red-dot {
+  background-color: #FF5733; /* 深红色背景 */
+  border-radius: 100%; 
+}
+
+.red-btn {
+  background: red; /* 红色背景 */
+}
+
+.red-btn:hover {
+    background-color: #FF5733; /* 深红色背景 */
+}
+
+.red-btn:active {
+  background-color: red;
+}

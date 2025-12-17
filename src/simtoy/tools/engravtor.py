@@ -156,7 +156,7 @@ class Element(gfx.WorldObject):
         self.params['light_source'] = 'red'
         self.params['power'] = 100
         self.params['speed'] = 100
-        self.params['pixelsize'] = 0.1
+        self.params['lightspotsize'] = 0.1
         self.obj = None
 
     def get_geometry_bounding_box(self):
@@ -187,12 +187,11 @@ class Element(gfx.WorldObject):
         return (lb,rb,rt,lt)
 
 class Label(Element):
-    def __init__(self,text,font_size,family,pixelsize,*args,**kwargs):
+    def __init__(self,text,font_size,family,*args,**kwargs):
         super().__init__(*args,**kwargs)
         
         self.font_size = font_size
         self.family = family
-        self.pixelsize_in_mm = pixelsize
         
         self.set_text(text)
 
@@ -244,15 +243,16 @@ class Label(Element):
         else: cr.set_source_rgb(0, 0, 1)
 
         if self.params['engraving_mode'] == 'fill': 
-            self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
-            cr.scale(self.pixelsize_in_mm*self.local.scale_x,self.pixelsize_in_mm*self.local.scale_y)
+            self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
+            cr.scale(self.params['lightspotsize']*self.local.scale_x,self.params['lightspotsize']*self.local.scale_y)
             surface = self.draw_to_image()
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
         else: 
+            self.params['pixelsize'] = round(self.params['lightspotsize'],2)
             cr.scale(self.local.scale_x,self.local.scale_y)
             cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(self.font_size * self.pixelsize_in_mm)
+            cr.set_font_size(self.font_size * self.params['lightspotsize'])
             text_extents = cr.text_extents(self.text)
             cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
             cr.text_path(self.text)
@@ -269,8 +269,8 @@ class Label(Element):
         tex = gfx.Texture(im[...,[2,1,0,3]],dim=2)
         tex_map = gfx.TextureMap(tex)
         
-        self.width = surface.get_width() * self.pixelsize_in_mm / 1000
-        self.height = surface.get_height() * self.pixelsize_in_mm / 1000
+        self.width = surface.get_width() * self.params['lightspotsize'] / 1000
+        self.height = surface.get_height() * self.params['lightspotsize'] / 1000
         
         self.remove(self.obj)
         self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
@@ -281,9 +281,8 @@ class Label(Element):
         self.set_text(self.text)
 
 class Bitmap(Element):
-    def __init__(self,filepath,pixelsize,*args,**kwargs):
+    def __init__(self,filepath,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.pixelsize_in_mm = pixelsize
         self.params['engraving_mode'] = 'fill'
 
         self.filepath = filepath
@@ -291,8 +290,8 @@ class Bitmap(Element):
         im = im.convert('RGBA')
         self.im = im
 
-        self.phys_width = im.size[0] * pixelsize / 1000
-        self.phys_height = im.size[1] * pixelsize / 1000
+        self.phys_width = im.size[0] * self.params['lightspotsize'] / 1000
+        self.phys_height = im.size[1] * self.params['lightspotsize'] / 1000
         
         tex = gfx.Texture(np.asarray(im),dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
@@ -300,6 +299,9 @@ class Bitmap(Element):
         self.add(self.obj)
  
         self.draw_to_image()
+    
+    def set_engraving_mode(self,mode : str):
+        self.params['engraving_mode'] = mode
 
     def get_image(self):
         return self.im.astype(np.uint8)
@@ -325,20 +327,19 @@ class Bitmap(Element):
         pixel_width,pixel_height = self.im.size
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        cr.scale(self.pixelsize_in_mm*self.local.scale_x,self.pixelsize_in_mm*self.local.scale_y)
+        cr.scale(self.params['lightspotsize']*self.local.scale_x,self.params['lightspotsize']*self.local.scale_y)
         stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
         surface = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
         cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
         cr.paint()
 
-        self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
+        self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
         cr.restore()
         pass
     
 class Vectors(Element):
-    def __init__(self,lines,pixelsize,*args,**kwargs):
+    def __init__(self,lines,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.pixelsize_in_mm = pixelsize
         points = np.concatenate(lines,axis=0)
         min_x = points[:,0].min()
         min_y = points[:,1].min()
@@ -366,10 +367,10 @@ class Vectors(Element):
         cr.translate(surface.get_width()/2,surface.get_height()/2)
         for line in self.lines:
             start = line.geometry.positions.data[0]
-            start = start * 1000 / self.pixelsize_in_mm * self.local.scale[:1]
+            start = start * 1000 / self.params['lightspotsize'] * self.local.scale[:1]
             cr.move_to(start[0],-start[1])
             for end in line.geometry.positions.data[1:]:
-                end = end * 1000 / self.pixelsize_in_mm * self.local.scale[:1]
+                end = end * 1000 / self.params['lightspotsize'] * self.local.scale[:1]
                 cr.line_to(end[0],-end[1])
             cr.close_path()
 
@@ -379,8 +380,8 @@ class Vectors(Element):
     def draw_to_image(self) -> cairo.ImageSurface:
         phy_width = int(self.width * self.local.scale_x * 1000)
         phy_height = int(self.height * self.local.scale_x * 1000)
-        img_width = int(phy_width / self.pixelsize_in_mm)
-        img_height = int(phy_height / self.pixelsize_in_mm)
+        img_width = int(phy_width / self.params['lightspotsize'])
+        img_height = int(phy_height / self.params['lightspotsize'])
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
         self.draw_to_surface(surface)
         return surface
@@ -395,7 +396,7 @@ class Vectors(Element):
 
         if self.params['engraving_mode'] == 'fill': 
             surface = self.draw_to_image()
-            cr.scale(self.pixelsize_in_mm,self.pixelsize_in_mm)
+            cr.scale(self.params['lightspotsize'],self.params['lightspotsize'])
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
         else: 
@@ -410,7 +411,7 @@ class Vectors(Element):
                 cr.close_path()
             cr.stroke()
 
-        self.params['pixelsize'] = round(self.pixelsize_in_mm / self.local.scale_x,2)
+        self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
         cr.restore()
 
     def set_engraving_mode(self,mode : str):
@@ -454,11 +455,11 @@ class Engravtor(gfx.WorldObject):
         persp_camera.show_pos(self.target_area.world.position,up=[0,0,1],depth=1.0)
         self.persp_camera = persp_camera
         
-        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.pixelsize_in_mm /1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
+        self.focus = gfx.Mesh(gfx.sphere_geometry(radius=self.lightspotsize /1000 ),gfx.MeshBasicMaterial(color=(1, 0, 0, 1),depth_test=False,flat_shading=True))
         self.focus.render_order = 1
         self.target_area.add(self.focus)
 
-        self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.pixelsize_in_mm/1000,thickness_space='world',color=(1, 0, 0, 0)))
+        self.laser = gfx.Line(gfx.Geometry(positions=[self.laser_aperture.local.position,self.focus.local.position]),gfx.LineMaterial(thickness=self.lightspotsize/1000,thickness_space='world',color=(1, 0, 0, 0)))
         self.laser.render_order = 1
         self.target_area.add(self.laser)
 
@@ -541,8 +542,8 @@ class Engravtor(gfx.WorldObject):
 
     def init_params(self):
         self.y_lim = self.x_lim = (0,0.100)
-        self.light_spot_size = 0.0075
-        self.pixelsize_in_mm = 0.1
+        self.lightspotsize = 0.1#0.0075
+        self.pixelsize = self.lightspotsize
         self.paths = list()
         self.speed = 100
         self.power = 0
@@ -556,8 +557,6 @@ class Engravtor(gfx.WorldObject):
     def set_consumable(self,name):
         target : gfx.WorldObject = next(self.scene.iter(lambda o: o.name == name))
         target.material.pick_write = True
-        # target.material.depth_test = False
-        # target.render_order = 
         target.cast_shadow = True
         target.receive_shadow=True
         target.local.position = self.target_area.local.position
@@ -582,7 +581,7 @@ class Engravtor(gfx.WorldObject):
         aabb = self.target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         
-        element = Label('中国智造',72,'KaiTi',self.pixelsize_in_mm,name='文本')
+        element = Label('中国智造',72,'KaiTi',name='文本')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -592,7 +591,7 @@ class Engravtor(gfx.WorldObject):
         target = self.target
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
-        element = Bitmap(filepath,self.pixelsize_in_mm,name='图片')
+        element = Bitmap(filepath,name='图片')
         scale = min(self.x_lim[1] / element.phys_width,self.y_lim[1] / element.phys_height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -603,7 +602,7 @@ class Engravtor(gfx.WorldObject):
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         
-        element = Vectors(lines,self.pixelsize_in_mm,name='矢量')
+        element = Vectors(lines,name='矢量')
         scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
         element.local.scale = scale if scale < 1 else 1
         element.local.z = target_height
@@ -631,77 +630,81 @@ class Engravtor(gfx.WorldObject):
             svg = BytesIO()
             with cairo.SVGSurface(svg, width, height) as surface:
                 cr = cairo.Context(surface)
-                cr.set_line_width(self.light_spot_size)
+                cr.set_line_width(self.lightspotsize)
                 cr.translate(width / 2,height / 2)
                 obj.draw_to_svg(cr)
 
             svgs.append((svg,width,height,obj.params))
         return svgs
     
-    def excute(self,lines : str):
-        while lines:
-            line_index = lines.find('\n')
-            line = lines[:line_index+1].strip()
-            lines = lines[line_index+1:]
-
-            if not line or line.startswith(';'): 
-                continue
-
-            # print(line)
-            moveable = False
-            x,y = self.focus.local.position[:2] * 1000
-            power = self.power
-            speed = self.speed
-            command = line.split(' ')
-            for param in command:
-                if param == 'G0':
-                    moveable = True
-                    x = 0
-                    y = 0
-                    power = 0
-                elif param == 'M3':
-                    self.laser.material.color = (1,0,0,power / 100)
+    def excute(self,gcode : str):
+        def excute_next(lines : list[str]):
+            while lines:
+                line = lines.pop(0).strip()
+                if not line or line.startswith(';'): 
                     continue
-                elif param == 'G1': 
-                    moveable = True
-                elif param == 'M5':
-                    self.laser.material.color = (1,0,0,0)
-                    continue
-                elif param.startswith('X'):
-                    x = float(param[1:])
-                    moveable = True
-                elif param.startswith('Y'):
-                    y = float(param[1:])
-                    moveable = True
-                elif param.startswith('F'):
-                    self.speed = speed = float(param[1:])
-                elif param.startswith('S'):
-                    self.power = power = float(param[1:])
-                    self.laser.material.color = (1,0,0,power / 100)
-                elif param == 'M2':
-                    self.focus.local.x = 0
-                    self.focus.local.y = 0
-                    self.laser.material.color = (1,0,0,0)
-                    self.laser.geometry.positions.data[1] = self.focus.local.position
-                    self.laser.geometry.positions.update_full()
-                    continue
-                else:
-                    pass
 
-            def f(dt):
-                if moveable:
-                    self.move(x,y,speed,power,dt)
-                self.excute(lines)
-            self.steps.append(f)
-            break
+                print(line)
+                moveable = False
+                x,y = self.focus.local.position[:2] * 1000
+                power = self.power
+                speed = self.speed
+                command = line.split(' ')
+                for param in command:
+                    if param.startswith('G0'):
+                        moveable = True
+                        x = 0
+                        y = 0
+                        power = 0
+                    elif param == 'G1': 
+                        moveable = True
+                    elif param.startswith('X'):
+                        x = float(param[1:])
+                        moveable = True
+                    elif param.startswith('Y'):
+                        y = float(param[1:])
+                        moveable = True
+                    elif param.startswith('F'):
+                        self.speed = speed = float(param[1:])
+                    elif param.startswith('S'):
+                        self.power = power = float(param[1:])
+                        self.laser.material.color = (1,0,0,power / 100)
+                    elif param == 'M2':
+                        self.laser.material.color = (1,0,0,0)
+                        continue
+                    elif param == 'M3':
+                        self.laser.material.color = (1,0,0,power / 100)
+                        continue
+                    elif param == 'M5':
+                        self.laser.material.color = (1,0,0,0)
+                        continue
+                    else:
+                        pass
+
+
+                if moveable: self.steps.append(lambda dt: self.move(x,y,speed,power,dt))
+                break
+            
+            if lines: self.steps.append(lambda dt: excute_next(lines))
+                
+        excute_next(gcode.split('\n'))
 
     def move(self,x,y,speed,power,dt):
+        def make_delta_move(x,y,power):
+            def delta_move(dt):
+                self.focus.local.x = x / 1000
+                self.focus.local.y = y / 1000
+                self.laser.material.color = (1,0,0,power / 100)
+                self.laser.geometry.positions.data[1] = self.focus.local.position
+                self.laser.geometry.positions.update_full()
+            return delta_move
+
         start = self.focus.local.position[:2] * 1000
         end = np.array([x,y])
         dir = end - start
         S = np.linalg.norm(dir)
 
-        if False and S > 0: 
+        if True and S > 0: 
             dir /= S
             v_max=speed*10; v0=0; v1=0; a=speed*10
             # 加速阶段：从v0到v_max
@@ -730,7 +733,7 @@ class Engravtor(gfx.WorldObject):
 
             t = np.linspace(0, total_time, round(total_time / dt))
 
-            for ti in t:
+            for i,ti in enumerate(t):
                 if ti <= t1:
                     s = v0 * ti + 0.5 * a * ti**2
                 elif ti <= t1 + t2:
@@ -741,27 +744,8 @@ class Engravtor(gfx.WorldObject):
 
                 xy = start + dir * s
 
-                def make_f(x,y,power):
-                    def f(dt):
-                        self.focus.local.x = x / 1000
-                        self.focus.local.y = y / 1000
-                        self.laser.material.color = (1,0,0,power / 100)
-                        self.laser.geometry.positions.data[1] = self.focus.local.position
-                        self.laser.geometry.positions.update_full()
-                    return f
-                    
-                self.steps.append(make_f(xy[0],xy[1],power))
+                self.steps.insert(i,make_delta_move(xy[0],xy[1],power))
         else:
-            def make_f(x,y,power):
-                def f(dt):
-                    self.focus.local.x = x / 1000
-                    self.focus.local.y = y / 1000
-                    self.laser.material.color = (1,0,0,power / 100)
-                    self.laser.geometry.positions.data[1] = self.focus.local.position
-                    self.laser.geometry.positions.update_full()
-                return f
-                
-            self.steps.append(make_f(x,y,power))
-
+            self.steps.insert(0,make_delta_move(x,y,power))
 
     def is_connected(self): return True
