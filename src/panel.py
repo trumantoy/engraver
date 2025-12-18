@@ -320,12 +320,13 @@ class Panel (Gtk.Box):
             def f2():
                 buffer = self.textview_gcode.get_buffer()
                 buffer.set_text(gcode)
+                self.gcode = gcode
                 self.btn_present.set_active(False)
 
             GLib.idle_add(f2)
 
         buffer = self.textview_gcode.get_buffer()
-        buffer.set_text('正在生成GCode...')
+        buffer.set_text(';正在生成GCode...')
         self.emit('preview', True)
 
         threading.Thread(target=f).start()
@@ -358,7 +359,7 @@ class Panel (Gtk.Box):
             
             item = self.device_selection.get_selected_item()
             if item and item.controller.connected: 
-                item.controller.excute(gcode)
+                item.controller.excute(self.gcode)
 
             sender.set_label('停止')
         else:        
