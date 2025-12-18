@@ -154,9 +154,9 @@ class Element(gfx.WorldObject):
         self.params['excutable'] = True
         self.params['engraving_mode'] = 'stroke'
         self.params['light_source'] = 'red'
-        self.params['power'] = 100
+        self.params['power'] = 30
         self.params['speed'] = 100
-        self.params['lightspotsize'] = 0.1
+        self.params['lightspotsize'] = 0.05
         self.obj = None
 
     def get_geometry_bounding_box(self):
@@ -644,7 +644,7 @@ class Engravtor(gfx.WorldObject):
                 if not line or line.startswith(';'): 
                     continue
 
-                print(line)
+                # print(line)
                 moveable = False
                 x,y = self.focus.local.position[:2] * 1000
                 power = self.power

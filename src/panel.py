@@ -30,6 +30,7 @@ class Panel (Gtk.Box):
     swt_excutable = Gtk.Template.Child('excutable')
     
     box_present = Gtk.Template.Child('box_present')
+    btn_present = Gtk.Template.Child('present')
     box_process = Gtk.Template.Child('box_process')
     box_start = Gtk.Template.Child('box_start')
     textview_gcode = Gtk.Template.Child('textview_gcode')
@@ -55,10 +56,7 @@ class Panel (Gtk.Box):
         self.device_selection = Gtk.SingleSelection.new(model)
         self.device_selection.set_autoselect(True)
         self.device_selection.set_can_unselect(True)
-        # self.device_selection.connect('selection-changed', self.update_status)
-        # GLib.timeout_add(1000, self.update_status)
-        threading.Thread(target=self.update_status,daemon=True).start()
-
+        GLib.timeout_add(1000,self.update_status)
 
         model = Gio.ListStore(item_type=GObject.Object)
         self.param_selection = Gtk.NoSelection.new(model)
@@ -75,29 +73,16 @@ class Panel (Gtk.Box):
         self.owner = tool
 
     def update_status(self):
-        from time import sleep
-        condition = threading.Event()
-        while True:
-            sleep(1)
-            item = self.device_selection.get_selected_item()
-            if item and item.controller.is_connected():
-                def f():
-                    self.img_status.remove_css_class('red-dot')
-                    self.img_status.add_css_class('green-dot')
-                    self.lbl_status.set_label('已连接')
-                    condition.set()
-                GLib.idle_add(f)
-            else:
-                def f():
-                    self.img_status.remove_css_class('green-dot')
-                    self.img_status.add_css_class('red-dot')
-                    self.lbl_status.set_label('未连接')
-                    condition.set()
-                GLib.idle_add(f)
-
-            condition.wait()
-            condition.clear()
-            
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected:
+            self.img_status.remove_css_class('red-dot')
+            self.img_status.add_css_class('green-dot')
+            self.lbl_status.set_label('已连接')
+        else:
+            self.img_status.remove_css_class('green-dot')
+            self.img_status.add_css_class('red-dot')
+            self.lbl_status.set_label('未连接')
+        return True
 
     @Gtk.Template.Callback()
     def device_manager_clicked(self, btn):
@@ -290,14 +275,16 @@ class Panel (Gtk.Box):
             def present():
                 if len(self.owner.steps) == 0: 
                     self.owner.excute(gcode)
-                    item = self.device_selection.get_selected_item()
-                    if item: item.controller.excute(gcode)
-    
+                
+                item = self.device_selection.get_selected_item()
+                if item and len(item.controller.steps) == 0: 
+                    item.controller.excute(gcode)
+
                 return self.get_mapped() and sender.get_active()
             GLib.idle_add(present)
         else:
             sender.set_label('走边框')
-            self.owner.steps.clear()        
+            self.owner.steps.clear()
             self.owner.excute('G0\n')
 
     @GObject.Signal(return_type=bool, arg_types=(object,))
@@ -305,46 +292,46 @@ class Panel (Gtk.Box):
 
     @Gtk.Template.Callback()
     def btn_process_clicked(self,sender):
-        if 0 == self.owner.count_elements():
-            return
+        if 0 == self.owner.count_elements(): return
 
         self.stack.set_visible_child_name('preview')
         self.box_start.set_visible(True)
         self.box_present.set_visible(False)
         self.box_process.set_visible(False)
         
-        gcode = ''
-        for svg,width,height,params in self.owner.export_svg():            
-            import tempfile
-            temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
-            svg_filepath = temp_file.name + '.svg'
-            gc_filepath = temp_file.name + '.gc'
-            print(svg_filepath)
+        def f():            
+            gcode = ''
+            for svg,width,height,params in self.owner.export_svg():            
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
+                svg_filepath = temp_file.name + '.svg'
+                gc_filepath = temp_file.name + '.gc'
+                print(svg_filepath)
 
-            with open(svg_filepath,'w') as f:
-                f.write(self.parse_svg(svg.getvalue().decode()))
-            
-            if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize'],params['lightspotsize']):
-                continue
-            
-            with open(gc_filepath,'r') as f:
-                gcode += f.read()
-        
+                with open(svg_filepath,'w') as f:
+                    f.write(self.parse_svg(svg.getvalue().decode()))
+                
+                if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize'],params['lightspotsize']):
+                    continue
+                
+                with open(gc_filepath,'r') as f:
+                    gcode += f.read()
+
+            def f2():
+                buffer = self.textview_gcode.get_buffer()
+                buffer.set_text(gcode)
+                self.btn_present.set_active(False)
+
+            GLib.idle_add(f2)
+
         buffer = self.textview_gcode.get_buffer()
-        start_iter = buffer.get_start_iter()
-        end_iter = buffer.get_end_iter()
-        buffer.insert(end_iter, gcode)
-        self.emit('preview', gcode)
-        
-        self.owner.excute(gcode)
-        
+        buffer.set_text('正在生成GCode...')
+        self.emit('preview', True)
+
+        threading.Thread(target=f).start()
+
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
-        buffer = self.textview_gcode.get_buffer()
-        start_iter = buffer.get_start_iter()
-        end_iter = buffer.get_end_iter()
-        buffer.delete(start_iter,end_iter)
-
         self.stack.set_visible_child_name('overview')
         self.box_start.set_visible(False)
         self.box_present.set_visible(True)
@@ -352,19 +339,36 @@ class Panel (Gtk.Box):
         self.emit('preview', None)
         self.owner.steps.clear()
         self.owner.excute('G0\n')
-
+        
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected: 
+            item.controller.steps.clear()
+            item.controller.excute('M5\nG0\n')
+        
 
     @Gtk.Template.Callback()
-    def btn_start_clicked(self,sender):
-        buffer = self.textview_gcode.get_buffer()
-        start_iter = buffer.get_start_iter()
-        end_iter = buffer.get_end_iter()
-        gcode = buffer.get_text(start_iter, end_iter, True)
-        
-        self.owner.steps.clear()
-        self.owner.excute('G0\n')
-        item = self.device_selection.get_selected_item()
-        if item: item.controller.excute(gcode)
+    def btn_start_toggled(self,sender):
+        if sender.get_active():
+            buffer = self.textview_gcode.get_buffer()
+            start_iter = buffer.get_start_iter()
+            end_iter = buffer.get_end_iter()
+            gcode = buffer.get_text(start_iter, end_iter, True)
+            
+            self.owner.excute(gcode)
+            
+            item = self.device_selection.get_selected_item()
+            if item and item.controller.connected: 
+                item.controller.excute(gcode)
+
+            sender.set_label('停止')
+        else:        
+            self.owner.steps.clear()
+            self.owner.excute('M5\nG0\n')
+            item = self.device_selection.get_selected_item()
+            if item and item.controller.connected: 
+                item.controller.excute('M5\nG0\n')
+
+            sender.set_label('开始')
         
     def parse_svg(self,svg_content):
         from lxml import etree

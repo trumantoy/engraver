@@ -18,10 +18,12 @@ class USBController:
     def __init__(self):
         self.serial = None
         self.name = ''
-        self.steps = []
-        threading.Thread(target=self.worker,daemon=True).start()
+        self.steps = []        
+        self.connected = False
         self.mutex = threading.Lock()
         self.event = threading.Event()
+        threading.Thread(target=self.worker,daemon=True).start()
+
     
     def connect(self,port):
         try:
@@ -36,30 +38,30 @@ class USBController:
             self.serial = None
             return False
         
-        return self.is_connected()
+        self.connected = self.is_connected()
+        return self.connected
     
     def disconnect(self):
         if self.serial:
             self.serial.close()
 
     def is_connected(self):
-        if not self.serial: return False
-        
-        try:
-            self.serial.write(b'$I\n')
-            res = self.serial.readall().decode()
-            print(res)
+        with self.mutex:
+            if not self.serial: return False
             
-            if '[MODEL:' not in res:
-                return False
+            try:
+                self.serial.write(b'$I\n')
+                res = self.serial.readall().decode()
+                
+                if '[MODEL:' not in res:
+                    return False
 
-            model_start = res.find('[MODEL:') + len('[MODEL:')
-            model_end = res.find(']', model_start)
-            if model_start > 0 and model_end > model_start:
-                self.name = res[model_start:model_end]
-        except:
-            return False
-        
+                model_start = res.find('[MODEL:') + len('[MODEL:')
+                model_end = res.find(']', model_start)
+                if model_start > 0 and model_end > model_start:
+                    self.name = res[model_start:model_end]
+            except:
+                return False
         return True
     
     def set_axes_invert(self):
@@ -74,32 +76,38 @@ class USBController:
     
     def excute(self, gcode:str):
         for line in gcode.splitlines(True):
-            if not line or line.startswith(';'): continue
+            if not line.strip(): continue
+            if line.split().startswith(';'): continue
             req = line.encode()
             self.steps.append(req)
-            print(req)
-        
         self.event.set()
-            
+
     def worker(self):
-        limit = 100
-        sent = 0
         while True:
-            self.event.wait()
-
-            for i in range(len(self.steps)):
-                req = self.steps.pop(0)
-                self.serial.write(req)
-                sent += 1
-                if sent > limit: sent -= len(self.serial.readlines())
+            sent = 0
+            received = 0
+            limit = 100
+            n = 1
             
+            with self.mutex:
+                while self.steps:
+                    req = self.steps.pop(0)
+                    self.serial.write(req)
+                    sent += 1
+                    if sent >= limit:
+                        res = self.serial.readline()
+                        n = len(res.splitlines(True))
+                        received += n
+                        limit += n
 
-    def get_queue_size(self):
-        req = '%\n'.encode()
-        self.serial.write(req)
-        res = self.serial.readline()
-        return int(res.decode().split(':')[1])
+                for _ in range(sent - received):
+                    self.serial.readline()
+                    n = 1
+                    limit += n
+                    received += n
 
+            self.connected = self.is_connected()
+                    
 @Gtk.Template(filename='ui/device_discovery.ui')
 class DeviceDiscoveryDialog (Gtk.Window):
     __gtype_name__ = "DeviceDiscoveryDialog"

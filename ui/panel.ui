@@ -594,11 +594,11 @@
                         <property name="visible">False</property>        
                         
                         <child>
-                            <object class="GtkButton" id="start">       
+                            <object class="GtkToggleButton" id="start">       
                                 <style><class name="green-btn"></class></style>
                                 <property name="label">开始</property>
                                 <property name="hexpand">True</property>
-                                <signal name="clicked" handler="btn_start_clicked" swapped="no"/>
+                                <signal name="toggled" handler="btn_start_toggled" swapped="no"/>
                             </object>
                         </child>
                         <child>
