@@ -146,6 +146,10 @@ class Panel (Gtk.Box):
         self.swt_excutable.set_active(obj.params['excutable'])
 
     @Gtk.Template.Callback()
+    def swt_excutable_state_set(self,swt,state):
+        self.obj.set_excutable(state)
+
+    @Gtk.Template.Callback()
     def btn_engraving_mode_stroke_clicked(self,btn):
         self.obj.set_engraving_mode('stroke')
         model = self.param_selection.get_model()
@@ -158,6 +162,14 @@ class Panel (Gtk.Box):
         model = self.param_selection.get_model()
         self.param_selection.set_model(None)
         self.param_selection.set_model(model)
+
+    @Gtk.Template.Callback()
+    def power_value_changed(self,spin):
+        self.obj.set_power(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def speed_value_changed(self,spin):
+        self.obj.set_speed(spin.get_value())
 
     def setup_listitem(self, factory, lsi):
         box = Gtk.Box()
@@ -235,7 +247,7 @@ class Panel (Gtk.Box):
 
         mode = '线条' if item.obj.params["engraving_mode"] == 'stroke' else '填充'
         lbl_mode.set_label(f'<span size="large">{mode}</span>')
-        light_source = '蓝光' if item.obj.params["light_source"] == 'blue' else '红光'
+        light_source = '紫外光' if item.obj.params["light_source"] == 'blue' else '红光'
         lbl_light_source.set_label(f'<span size="medium">{light_source}</span>')
         lbl_power.set_label(f'<span color="lightgray" size="medium">{item.obj.params["power"]}%</span>')
         lbl_speed.set_label(f'<span color="lightgray" size="medium">{item.obj.params["speed"]}mm/s</span>')
@@ -266,7 +278,7 @@ class Panel (Gtk.Box):
                 lb,rb,rt,lt = item.get_oriented_bounding_box()
                 gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
                 gcode += f'M3\n'
-                gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} S10\n'
+                gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} S5\n'
                 gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
                 gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
                 gcode += f'G1 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
@@ -301,7 +313,7 @@ class Panel (Gtk.Box):
         
         def f():            
             gcode = ''
-            for svg,width,height,params in self.owner.export_svg():            
+            for svg,width,height,params in self.owner.export_svg():
                 import tempfile
                 temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
                 svg_filepath = temp_file.name + '.svg'
@@ -311,17 +323,28 @@ class Panel (Gtk.Box):
                 with open(svg_filepath,'w') as f:
                     f.write(self.parse_svg(svg.getvalue().decode()))
                 
-                if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize'],params['lightspotsize']):
+                if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize']):
                     continue
                 
                 with open(gc_filepath,'r') as f:
                     gcode += f.read()
 
             def f2():
-                buffer = self.textview_gcode.get_buffer()
-                buffer.set_text(gcode)
                 self.gcode = gcode
                 self.btn_present.set_active(False)
+
+                buffer = self.textview_gcode.get_buffer()
+                mark = buffer.create_mark("end", buffer.get_end_iter(), False)
+
+                def f3():
+                    self.textview_gcode.scroll_mark_onscreen(mark)
+                    visible_rect = self.textview_gcode.get_visible_rect()
+                    iter,i = self.textview_gcode.get_line_at_y(visible_rect.y + visible_rect.height)
+                    return iter.get_line() + 1 < buffer.get_line_count()
+
+                buffer.set_text(gcode)
+                self.textview_gcode.grab_focus()
+                GLib.timeout_add(500, f3)
 
             GLib.idle_add(f2)
 
@@ -329,10 +352,13 @@ class Panel (Gtk.Box):
         buffer.set_text(';正在生成GCode...')
         self.emit('preview', True)
 
-        threading.Thread(target=f).start()
+        self.gcoding = threading.Thread(target=f,daemon=True)
+        self.gcoding.start()
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
+        if self.gcoding.is_alive():
+            self.gcoding.join()
         self.stack.set_visible_child_name('overview')
         self.box_start.set_visible(False)
         self.box_present.set_visible(True)
@@ -349,6 +375,9 @@ class Panel (Gtk.Box):
 
     @Gtk.Template.Callback()
     def btn_start_toggled(self,sender):
+        if self.gcoding.is_alive():
+            self.gcoding.join()
+
         if sender.get_active():
             buffer = self.textview_gcode.get_buffer()
             start_iter = buffer.get_start_iter()
@@ -359,14 +388,15 @@ class Panel (Gtk.Box):
             
             item = self.device_selection.get_selected_item()
             if item and item.controller.connected: 
-                item.controller.excute(self.gcode)
+                item.controller.excute(gcode)
 
             sender.set_label('停止')
         else:        
             self.owner.steps.clear()
             self.owner.excute('M5\nG0\n')
             item = self.device_selection.get_selected_item()
-            if item and item.controller.connected: 
+            if item and item.controller.connected:             
+                item.controller.steps.clear()
                 item.controller.excute('M5\nG0\n')
 
             sender.set_label('开始')
@@ -416,7 +446,7 @@ class Panel (Gtk.Box):
         ).decode("utf-8")
         return result
 
-    def export_gcode_from_svg(self,svg_filepath,gc_filepath,width,height,power,speed,pixelsize,lightspotsize):
+    def export_gcode_from_svg(self,svg_filepath,gc_filepath,width,height,power,speed,pixelsize):
         from svg2gcode.__main__ import svg2gcode
         from svg2gcode.svg_to_gcode import css_color
         import argparse
@@ -476,7 +506,7 @@ class Panel (Gtk.Box):
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + '3.3.6', help="show version number and exit")
 
         # 使用临时文件作为输出路径
-        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--imagepower',str(power),'--imagespeed',str(speed), '--pixelsize',str(pixelsize),'--lightspotsize',str(lightspotsize)])
+        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--imagepower',str(power),'--imagespeed',str(speed), '--pixelsize',str(pixelsize)])
         
         if args.color_coded != "":
             if args.pathcut:

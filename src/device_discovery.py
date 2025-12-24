@@ -65,19 +65,21 @@ class USBController:
         return True
     
     def set_axes_invert(self):
-        req = f'$240P2P6P5\n'.encode()
-        self.serial.write(req)
-        res = self.serial.readline()
+        with self.mutex:
+            req = f'$240P2P6P5\n'.encode()
+            self.serial.write(req)
+            res = self.serial.readline()
 
     def set_process_params(self):
-        req = f'T0 C22\n'.encode()
-        self.serial.write(req)
-        res = self.serial.readline()
+        with self.mutex:
+            req = f'T0 C22\n'.encode()
+            self.serial.write(req)
+            res = self.serial.readline()
     
     def excute(self, gcode:str):
         for line in gcode.splitlines(True):
             if not line.strip(): continue
-            if line.split().startswith(';'): continue
+            if line.strip().startswith(';'): continue
             req = line.encode()
             self.steps.append(req)
         self.event.set()
@@ -164,5 +166,5 @@ class DeviceDiscoveryDialog (Gtk.Window):
                 device.controller = controller
                 GLib.idle_add(lambda: self.selection.get_model().append(device))
 
-        threading.Thread(target=f,daemon=True).start()
-
+        t = threading.Thread(target=f,daemon=True)
+        t.start()

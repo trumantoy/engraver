@@ -179,6 +179,7 @@
                                                             <object class="GtkSwitch" id="excutable">
                                                                 <property name="margin-top">10</property>
                                                                 <property name="margin-bottom">10</property>  
+                                                                <signal name="state-set" handler="swt_excutable_state_set" />
                                                             </object>
                                                         </child>
                                                     </object>
@@ -232,8 +233,7 @@
                                                         <property name="model">
                                                             <object class="GtkStringList">
                                                                 <items>
-                                                                    <item>蓝光</item>
-                                                                    <item>红光</item>
+                                                                    <item>紫外光</item>
                                                                 </items>
                                                             </object>
                                                         </property>
@@ -269,7 +269,7 @@
                                                             </object>
                                                         </property>
                                                         <property name="climb_rate">1</property>
-                                                        <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                                        <signal name="value-changed" handler="power_value_changed"/>
                                                     </object>
                                                 </child>
                                             </object>
@@ -295,7 +295,7 @@
                                                         <property name="adjustment">
                                                             <object class="GtkAdjustment">
                                                                 <property name="lower">1</property>
-                                                                <property name="upper">100</property>
+                                                                <property name="upper">1000</property>
                                                                 <property name="step_increment">1</property>
                                                                 <property name="page_increment">10</property>
                                                                 <property name="page_size">0</property>
@@ -303,7 +303,7 @@
                                                             </object>
                                                         </property>
                                                         <property name="climb_rate">1</property>
-                                                        <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                                        <signal name="value-changed" handler="speed_value_changed"/>
                                                     </object>
                                                 </child>
                                             </object>

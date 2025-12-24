@@ -166,9 +166,11 @@ class AppWindow (Gtk.ApplicationWindow):
             self.propbar.set_visible(False)
             self.hotbar.set_visible(False)
             self.tool.remove_event_handler(self.tool._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
+            # self.tool.hide_all_elements()
         else:
             self.hotbar.set_visible(True)
             self.tool.add_event_handler(self.tool._process_event,"pointer_down","pointer_move","pointer_up",'wheel')
+            # self.tool.show_all_elements()
 
     def file_import(self, sender, args):
         dialog = Gtk.FileDialog()

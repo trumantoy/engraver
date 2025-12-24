@@ -153,11 +153,26 @@ class Element(gfx.WorldObject):
         self.params = dict()
         self.params['excutable'] = True
         self.params['engraving_mode'] = 'stroke'
-        self.params['light_source'] = 'red'
+        self.params['light_source'] = 'blue'
         self.params['power'] = 30
-        self.params['speed'] = 100
-        self.params['lightspotsize'] = 0.05
+        self.params['speed'] = 300
+        self.params['pixelsize'] = 1
+        
         self.obj = None
+    def set_excutable(self,state):
+        self.params['excutable'] = state
+
+    def set_engraving_mode(self,mode):
+        self.params['engraving_mode'] = mode
+
+    def set_light_source(self,source):
+        self.params['light_source'] = source
+
+    def set_power(self,power):
+        self.params['power'] = power
+
+    def set_speed(self,speed):
+        self.params['speed'] = speed
 
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
@@ -243,22 +258,17 @@ class Label(Element):
         else: cr.set_source_rgb(0, 0, 1)
 
         if self.params['engraving_mode'] == 'fill': 
-            self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
-            cr.scale(self.params['lightspotsize']*self.local.scale_x,self.params['lightspotsize']*self.local.scale_y)
+            cr.scale(self.local.scale_x,self.local.scale_y)
             surface = self.draw_to_image()
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
         else: 
-            self.params['pixelsize'] = round(self.params['lightspotsize'],2)
-            cr.scale(self.local.scale_x,self.local.scale_y)
             cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(self.font_size * self.params['lightspotsize'])
+            cr.set_font_size(self.font_size * 0.1)
             text_extents = cr.text_extents(self.text)
             cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
             cr.text_path(self.text)
             cr.stroke()
-
-
         cr.restore()
 
     def set_text(self,text):
@@ -269,11 +279,8 @@ class Label(Element):
         tex = gfx.Texture(im[...,[2,1,0,3]],dim=2)
         tex_map = gfx.TextureMap(tex)
         
-        self.width = surface.get_width() * self.params['lightspotsize'] / 1000
-        self.height = surface.get_height() * self.params['lightspotsize'] / 1000
-        
         self.remove(self.obj)
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.obj = gfx.Mesh(gfx.plane_geometry(surface.get_width() / 1000,surface.get_height() / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(self.obj)
 
     def set_engraving_mode(self,mode : str):
@@ -289,13 +296,10 @@ class Bitmap(Element):
         im = Image.open(filepath)
         im = im.convert('RGBA')
         self.im = im
-
-        self.phys_width = im.size[0] * self.params['lightspotsize'] / 1000
-        self.phys_height = im.size[1] * self.params['lightspotsize'] / 1000
         
         tex = gfx.Texture(np.asarray(im),dim=2)
         tex_map = gfx.TextureMap(tex,filter='nearest')
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.phys_width,self.phys_height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.obj = gfx.Mesh(gfx.plane_geometry(im.size[0] / 1000,im.size[1] / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         self.add(self.obj)
  
         self.draw_to_image()
@@ -327,13 +331,12 @@ class Bitmap(Element):
         pixel_width,pixel_height = self.im.size
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
-        cr.scale(self.params['lightspotsize']*self.local.scale_x,self.params['lightspotsize']*self.local.scale_y)
+        cr.scale(self.local.scale_x,self.local.scale_y)
         stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
         surface = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
         cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
         cr.paint()
-
-        self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
+        
         cr.restore()
         pass
     
@@ -345,15 +348,12 @@ class Vectors(Element):
         min_y = points[:,1].min()
         max_x = points[:,0].max()
         max_y = points[:,1].max()
-        self.width = (max_x - min_x)
-        self.height = (max_y - min_y)
+        self.phy_width = (max_x - min_x)
+        self.phy_height = (max_y - min_y)
 
-        self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height))
+        self.obj = gfx.Mesh(gfx.plane_geometry(self.phy_width,self.phy_height))
         self.lines = []
         for line in lines:
-            line = np.array(line)[:,[0,1]]
-            line = line - [min_x + self.width/2,min_y + self.height/2]
-            line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))
             line = gfx.Line(gfx.Geometry(positions=line.astype(np.float32)),gfx.LineMaterial(thickness=1,color=self.params['light_source'],depth_test=False))
             self.lines.append(line)
             self.obj.add(line)
@@ -367,10 +367,10 @@ class Vectors(Element):
         cr.translate(surface.get_width()/2,surface.get_height()/2)
         for line in self.lines:
             start = line.geometry.positions.data[0]
-            start = start * 1000 / self.params['lightspotsize'] * self.local.scale[:1]
+            start = start * 1000 
             cr.move_to(start[0],-start[1])
             for end in line.geometry.positions.data[1:]:
-                end = end * 1000 / self.params['lightspotsize'] * self.local.scale[:1]
+                end = end * 1000 
                 cr.line_to(end[0],-end[1])
             cr.close_path()
 
@@ -378,10 +378,10 @@ class Vectors(Element):
             else: cr.stroke()
 
     def draw_to_image(self) -> cairo.ImageSurface:
-        phy_width = int(self.width * self.local.scale_x * 1000)
-        phy_height = int(self.height * self.local.scale_x * 1000)
-        img_width = int(phy_width / self.params['lightspotsize'])
-        img_height = int(phy_height / self.params['lightspotsize'])
+        phy_width = int(self.phy_width * 1000)
+        phy_height = int(self.phy_height * 1000)
+        img_width = int(phy_width)
+        img_height = int(phy_height)
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, img_width, img_height)
         self.draw_to_surface(surface)
         return surface
@@ -396,11 +396,10 @@ class Vectors(Element):
 
         if self.params['engraving_mode'] == 'fill': 
             surface = self.draw_to_image()
-            cr.scale(self.params['lightspotsize'],self.params['lightspotsize'])
+            cr.scale(self.local.scale_x,self.local.scale_y)
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
-        else: 
-            cr.scale(1,1)
+        else:            
             for line in self.lines:
                 start = line.geometry.positions.data[0]
                 start = start * self.local.scale[:1]
@@ -409,9 +408,7 @@ class Vectors(Element):
                     end = end * self.local.scale[:1]
                     cr.line_to(end[0] * 1000,-end[1] * 1000)
                 cr.close_path()
-            cr.stroke()
-
-        self.params['pixelsize'] = round(self.params['lightspotsize'] / self.local.scale_x,2)
+            cr.stroke()  
         cr.restore()
 
     def set_engraving_mode(self,mode : str):
@@ -422,9 +419,9 @@ class Vectors(Element):
             argb = np.frombuffer(surface.get_data(), dtype=np.uint8).reshape((surface.get_height(),surface.get_width(), 4))
             tex = gfx.Texture(argb[...,[2,1,0,3]],dim=2)
             tex_map = gfx.TextureMap(tex)
-            self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+            self.obj = gfx.Mesh(gfx.plane_geometry(self.phy_width,self.phy_height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
         else:
-            self.obj = gfx.Mesh(gfx.plane_geometry(self.width,self.height))
+            self.obj = gfx.Mesh(gfx.plane_geometry(self.phy_width,self.phy_height))
             for line in self.lines:
                 self.obj.add(line)
         self.add(self.obj)
@@ -542,8 +539,7 @@ class Engravtor(gfx.WorldObject):
 
     def init_params(self):
         self.y_lim = self.x_lim = (0,0.100)
-        self.lightspotsize = 0.1#0.0075
-        self.pixelsize = self.lightspotsize
+        self.lightspotsize = 0.1
         self.paths = list()
         self.speed = 100
         self.power = 0
@@ -582,8 +578,7 @@ class Engravtor(gfx.WorldObject):
         target_height = (aabb[1][2] - aabb[0][2])
         
         element = Label('中国智造',72,'KaiTi',name='文本')
-        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
-        element.local.scale = scale if scale < 1 else 1
+        element.local.scale = self.lightspotsize
         element.local.z = target_height
         self.target_area.add(element)
 
@@ -592,8 +587,8 @@ class Engravtor(gfx.WorldObject):
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
         element = Bitmap(filepath,name='图片')
-        scale = min(self.x_lim[1] / element.phys_width,self.y_lim[1] / element.phys_height)
-        element.local.scale = scale if scale < 1 else 1
+        element.local.scale = self.lightspotsize
+
         element.local.z = target_height
         self.target_area.add(element)
 
@@ -601,10 +596,25 @@ class Engravtor(gfx.WorldObject):
         target = self.target
         aabb = target.get_geometry_bounding_box()
         target_height = (aabb[1][2] - aabb[0][2])
+
+        points = np.concatenate(lines,axis=0)
+        min_x = points[:,0].min()
+        min_y = points[:,1].min()
+        max_x = points[:,0].max()
+        max_y = points[:,1].max()
+        phy_width = (max_x - min_x)
+        phy_height = (max_y - min_y)
+        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height))
+
+        vectors = []
+        for line in lines:
+            line = np.array(line)[:,[0,1]]
+            line = (line - [min_x + phy_width/2,min_y + phy_height/2]) * scale / self.lightspotsize
+            line = np.hstack((line, np.zeros((line.shape[0], 1), dtype=line.dtype)))
+            vectors.append(line)
         
-        element = Vectors(lines,name='矢量')
-        scale = min(self.x_lim[1] / element.width,self.y_lim[1] / element.height)
-        element.local.scale = scale if scale < 1 else 1
+        element = Vectors(vectors,name='矢量')
+        element.local.scale = self.lightspotsize
         element.local.z = target_height
         self.target_area.add(element)
 
@@ -613,8 +623,21 @@ class Engravtor(gfx.WorldObject):
         for obj in self.target_area.children:
             if Element not in obj.__class__.__mro__: continue
             obj : Label | Bitmap | Vectors
+            if not obj.params['excutable']: continue
             i+=1
         return i
+
+    def hide_all_elements(self):
+        for obj in self.target_area.children:
+            if Element not in obj.__class__.__mro__: continue
+            obj : Label | Bitmap | Vectors
+            obj.visible = False
+
+    def show_all_elements(self):
+        for obj in self.target_area.children:
+            if Element not in obj.__class__.__mro__: continue
+            obj : Label | Bitmap | Vectors
+            obj.visible = True
 
     def export_svg(self):
         from io import BytesIO
@@ -626,6 +649,7 @@ class Engravtor(gfx.WorldObject):
         for obj in self.target_area.children:
             if Element not in obj.__class__.__mro__: continue
             obj : Label | Bitmap | Vectors
+            if not obj.params['excutable']: continue
 
             svg = BytesIO()
             with cairo.SVGSurface(svg, width, height) as surface:
@@ -633,7 +657,8 @@ class Engravtor(gfx.WorldObject):
                 cr.set_line_width(self.lightspotsize)
                 cr.translate(width / 2,height / 2)
                 obj.draw_to_svg(cr)
-
+        
+            obj.params['pixelsize'] = 1 / (obj.local.scale_x / self.lightspotsize)
             svgs.append((svg,width,height,obj.params))
         return svgs
     
