@@ -731,7 +731,7 @@ class Engravtor(gfx.WorldObject):
 
         if True and S > 0: 
             dir /= S
-            v_max=speed*10; v0=0; v1=0; a=speed*10
+            v_max=speed; v0=0; v1=0; a=speed
             # 加速阶段：从v0到v_max
             t1 = (v_max - v0) / a  # 加速时间
             s1 = v0 * t1 + 0.5 * a * t1**2  # 加速距离

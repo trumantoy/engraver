@@ -323,6 +323,7 @@ class Panel (Gtk.Box):
                 with open(svg_filepath,'w') as f:
                     f.write(self.parse_svg(svg.getvalue().decode()))
                 
+                print(params)
                 if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize']):
                     continue
                 
@@ -506,7 +507,7 @@ class Panel (Gtk.Box):
         parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + '3.3.6', help="show version number and exit")
 
         # 使用临时文件作为输出路径
-        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--imagepower',str(power),'--imagespeed',str(speed), '--pixelsize',str(pixelsize)])
+        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--cuttingpower',str(round(power)),'--imagepower',str(round(power)),'--cuttingspeed',str(round(speed)), '--imagespeed',str(round(speed)), '--pixelsize',str(round(pixelsize,2))])
         
         if args.color_coded != "":
             if args.pathcut:
