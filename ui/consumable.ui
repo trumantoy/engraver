@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+
+  <template class="ConsumableDialog" parent="GtkWindow">
+
+    <property name="width-request">800</property>
+    <property name="height-request">600</property>
+    <child type="titlebar">
+      <object class="GtkHeaderBar" id="header">
+        <property name="show-title-buttons">yes</property>
+
+        <child type="start">
+          <object class="GtkLabel">
+            <property name="margin-start">20</property>
+            <property name="margin-end">20</property>
+            <property name="use-markup">true</property>
+            <property name="label">&lt;span size="large"&gt;选择材料&lt;/span&gt;</property>
+          </object>
+        </child>
+        
+        <child type="title">
+          <object class="GtkSearchEntry">
+            <property name="hexpand">True</property>
+          </object>
+        </child>
+
+      </object>
+    </child>
+
+    <child>
+      <object class="GtkBox">
+        <property name="orientation">vertical</property>
+        <property name="margin-top">20</property>
+        <property name="margin-bottom">20</property>
+        <property name="margin-start">20</property>
+        <property name="margin-end">20</property>
+        <property name="spacing">10</property>
+        
+        <child>
+          <object class="GtkScrolledWindow">
+            <property name="hexpand">True</property>
+            <property name="vexpand">True</property>
+            <child>
+              <object class="GtkGridView" id="consumables">
+                <property name="vexpand">True</property>
+              </object>
+            </child>
+          </object>
+        </child>
+
+        <child>
+          <object class="GtkButton" id="ok">
+            <property name="hexpand">False</property>
+            <property name="halign">end</property>
+            <property name="label">确认</property>
+            <signal name="clicked" handler="btn_ok_clicked" swapped="no"/>
+          </object>
+        </child>
+
+      </object>
+    </child>
+  </template>
+</interface>

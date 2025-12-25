@@ -33,6 +33,7 @@ class AppWindow (Gtk.ApplicationWindow):
     hotbar : Hotbar = Gtk.Template.Child('hotbar')
     propbar : Propbar = Gtk.Template.Child('propbar')
     statusbar : Gtk.Revealer = Gtk.Template.Child('statusbar')
+    btn_consumable : Gtk.Button = Gtk.Template.Child('consumable')
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
@@ -113,6 +114,22 @@ class AppWindow (Gtk.ApplicationWindow):
 
         self.prev_width = width
         Gtk.ApplicationWindow.do_size_allocate(self,width,height,baseline)
+
+    @Gtk.Template.Callback()
+    def on_consumable_clicked(self,sender, *args):
+        from consumable import ConsumableDialog
+        consumable_dlg = ConsumableDialog()
+        consumable_dlg.set_modal(True)
+        consumable_dlg.connect('close-request', self.consumable_dialog_closed)
+        consumable_dlg.present()
+
+    def consumable_dialog_closed(self, dlg):
+        if dlg.result:
+            # dlg.result.power
+            # dlg.result.speed
+            print(dlg.result.label)
+            # self.tool.set_consumable(dlg.result)
+
 
     def draw(self,area, cr : cairo.Context, area_w, area_h):
         width,height = self.canvas.get_physical_size()

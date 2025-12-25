@@ -33,6 +33,7 @@ class Panel (Gtk.Box):
     btn_present = Gtk.Template.Child('present')
     box_process = Gtk.Template.Child('box_process')
     box_start = Gtk.Template.Child('box_start')
+    btn_start = Gtk.Template.Child('start')
     textview_gcode = Gtk.Template.Child('textview_gcode')
     
     # listview = Gtk.Template.Child('geoms')
@@ -341,7 +342,11 @@ class Panel (Gtk.Box):
                     self.textview_gcode.scroll_mark_onscreen(mark)
                     visible_rect = self.textview_gcode.get_visible_rect()
                     iter,i = self.textview_gcode.get_line_at_y(visible_rect.y + visible_rect.height)
-                    return iter.get_line() + 1 < buffer.get_line_count()
+
+                    if iter.get_line() + 1 == buffer.get_line_count():
+                        self.btn_start.set_sensitive(True)
+                        return False
+                    return True
 
                 buffer.set_text(gcode)
                 self.textview_gcode.grab_focus()
@@ -355,6 +360,7 @@ class Panel (Gtk.Box):
 
         self.gcoding = threading.Thread(target=f,daemon=True)
         self.gcoding.start()
+        self.btn_start.set_sensitive(False)
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
