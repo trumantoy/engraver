@@ -33,7 +33,9 @@ class AppWindow (Gtk.ApplicationWindow):
     hotbar : Hotbar = Gtk.Template.Child('hotbar')
     propbar : Propbar = Gtk.Template.Child('propbar')
     statusbar : Gtk.Revealer = Gtk.Template.Child('statusbar')
+    btn_process_mode : Gtk.Button = Gtk.Template.Child('process_mode')
     btn_consumable : Gtk.Button = Gtk.Template.Child('consumable')
+
 
     def __init__(self):
         provider = Gtk.CssProvider.new()
@@ -116,6 +118,19 @@ class AppWindow (Gtk.ApplicationWindow):
         Gtk.ApplicationWindow.do_size_allocate(self,width,height,baseline)
 
     @Gtk.Template.Callback()
+    def on_process_mode_clicked(self,sender, *args):
+        from process_mode import ProcessModeDialog
+        process_mode_dlg = ProcessModeDialog()
+        process_mode_dlg.set_modal(True)
+        process_mode_dlg.connect('close-request', self.process_mode_dialog_closed)
+        process_mode_dlg.present()
+    
+    def process_mode_dialog_closed(self, dlg):
+        if dlg.result:
+            print(dlg.result.label)
+            self.btn_process_mode.set_label(dlg.result.label)
+
+    @Gtk.Template.Callback()
     def on_consumable_clicked(self,sender, *args):
         from consumable import ConsumableDialog
         consumable_dlg = ConsumableDialog()
@@ -128,6 +143,7 @@ class AppWindow (Gtk.ApplicationWindow):
             # dlg.result.power
             # dlg.result.speed
             print(dlg.result.label)
+            self.btn_consumable.set_label(dlg.result.label)
             # self.tool.set_consumable(dlg.result)
 
 

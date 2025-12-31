@@ -307,6 +307,20 @@ class Bitmap(Element):
     def set_engraving_mode(self,mode : str):
         self.params['engraving_mode'] = mode
 
+        if mode == 'fill':
+            self.remove(self.obj)
+            im = Image.open(self.filepath)
+            im = im.convert('RGBA')
+            self.im = im
+            
+            tex = gfx.Texture(np.asarray(im),dim=2)
+            tex_map = gfx.TextureMap(tex,filter='nearest')
+            self.obj = gfx.Mesh(gfx.plane_geometry(im.size[0] / 1000,im.size[1] / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+            self.add(self.obj)
+        elif mode == 'threed':
+            pass
+            # self.obj.material = gfx.MeshBasicMaterial(map=tex_map,depth_test=False)
+
     def get_image(self):
         return self.im.astype(np.uint8)
     
@@ -420,10 +434,11 @@ class Vectors(Element):
             tex = gfx.Texture(argb[...,[2,1,0,3]],dim=2)
             tex_map = gfx.TextureMap(tex)
             self.obj = gfx.Mesh(gfx.plane_geometry(self.phy_width,self.phy_height),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
-        else:
+        elif mode == 'stroke':
             self.obj = gfx.Mesh(gfx.plane_geometry(self.phy_width,self.phy_height))
             for line in self.lines:
                 self.obj.add(line)
+
         self.add(self.obj)
 
 class Engravtor(gfx.WorldObject):

@@ -39,8 +39,14 @@
                             <object class="GtkBox">
                                 <property name="spacing">5</property>
                                 <child>
-                                    <object class="GtkImage" id="img_status">
-                                        <style><class name="green-dot"></class></style>
+                                    <object class="GtkBox">
+                                        <property name="orientation">vertical</property>
+                                        <child>
+                                            <object class="GtkImage" id="img_status">
+                                                <style><class name="green-dot"></class></style>
+                                                <property name="margin-top">2</property>
+                                            </object>
+                                        </child>
                                     </object>
                                 </child>
 
@@ -207,12 +213,13 @@
                                                         <signal name="clicked" handler="btn_engraving_mode_full_clicked" />
                                                     </object>
                                                 </child>
-                                                <!-- <child>
+                                                <child>
                                                     <object class="GtkToggleButton" id="c">         
-                                                        <property name="label">线条切割</property>
+                                                        <property name="label">立体雕刻</property>
                                                         <property name="group">a</property>
+                                                        <signal name="clicked" handler="btn_engraving_mode_threed_clicked" />
                                                     </object>
-                                                </child> -->
+                                                </child>
                                             </object>
                                         </child>
 

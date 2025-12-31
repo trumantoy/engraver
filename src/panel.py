@@ -24,6 +24,7 @@ class Panel (Gtk.Box):
     image_icon = Gtk.Template.Child('icon')
     btn_engraving_mode_stroke = Gtk.Template.Child('a')
     btn_engraving_mode_full = Gtk.Template.Child('b')
+    btn_engraving_mode_threed = Gtk.Template.Child('c')
     dp_light_source = Gtk.Template.Child('light_source')
     spin_power = Gtk.Template.Child('power')
     spin_speed = Gtk.Template.Child('speed')
@@ -120,7 +121,8 @@ class Panel (Gtk.Box):
         if obj.__class__.__name__ == 'Label':
             self.label_kind.set_label('文本')
             self.image_icon.set_from_icon_name('format-text-bold')
-            
+            self.btn_engraving_mode_stroke.set_sensitive(True)
+            self.btn_engraving_mode_threed.set_sensitive(False)            
             if obj.params['engraving_mode'] == 'stroke':
                 self.btn_engraving_mode_stroke.set_active(True)
             elif obj.params['engraving_mode'] == 'fill':
@@ -129,7 +131,8 @@ class Panel (Gtk.Box):
         elif obj.__class__.__name__ == 'Vectors':
             self.label_kind.set_label('矢量图')
             self.image_icon.set_from_icon_name('folder-publicshare-symbolic')
-
+            self.btn_engraving_mode_stroke.set_sensitive(True)
+            self.btn_engraving_mode_threed.set_sensitive(False)
             if obj.params['engraving_mode'] == 'stroke':
                 self.btn_engraving_mode_stroke.set_active(True)
             elif obj.params['engraving_mode'] == 'fill':
@@ -139,7 +142,11 @@ class Panel (Gtk.Box):
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')
             self.btn_engraving_mode_stroke.set_sensitive(False)
-            self.btn_engraving_mode_full.set_active(True)
+            self.btn_engraving_mode_threed.set_sensitive(True)
+            if obj.params['engraving_mode'] == 'fill':
+                self.btn_engraving_mode_full.set_active(True)
+            elif obj.params['engraving_mode'] == 'threed':
+                self.btn_engraving_mode_threed.set_active(True)
         
         self.dp_light_source.set_selected(0 if obj.params['light_source'] == 'blue' else 1)
         self.spin_power.set_value(obj.params['power'])
@@ -160,6 +167,13 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def btn_engraving_mode_full_clicked(self,btn):
         self.obj.set_engraving_mode('fill')
+        model = self.param_selection.get_model()
+        self.param_selection.set_model(None)
+        self.param_selection.set_model(model)
+
+    @Gtk.Template.Callback()
+    def btn_engraving_mode_threed_clicked(self,btn):
+        self.obj.set_engraving_mode('threed')
         model = self.param_selection.get_model()
         self.param_selection.set_model(None)
         self.param_selection.set_model(model)

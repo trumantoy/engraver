@@ -24,7 +24,7 @@ class DeviceManagerDialog (Gtk.Window):
         factory = Gtk.SignalListItemFactory()
         factory.connect("setup", self.setup_listitem)
         factory.connect("bind", self.bind_listitem)
-        self.lsv_devices.set_factory(factory)        
+        self.lsv_devices.set_factory(factory)
         self.result = None
         
     def setup_listitem(self, factory, listitem):
