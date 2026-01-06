@@ -55,7 +55,7 @@
 
         <child type="title">
           <object class="GtkLabel">
-            <property name="label">XLaserLab</property>
+            <property name="label">Xlaserlab</property>
           </object>
         </child>
 

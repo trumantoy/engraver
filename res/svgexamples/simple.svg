@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+    <!-- 曲线 -->
+    <path d="M 50 150 Q 200 100 350 150" stroke="green" stroke-width="1" fill="none"/>
+    <path d="M 50 200 Q 200 150 350 200" stroke="purple" stroke-width="1" fill="none"/>
+    <!-- 圆形曲线 -->
+    <path d="M 200 250 A 50 50 0 1 1 200 150" stroke="orange" stroke-width="1" fill="none"/>
+</svg>

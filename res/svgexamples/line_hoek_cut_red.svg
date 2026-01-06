@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+    height="80"
+    width="80"
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:svg="http://www.w3.org/2000/svg">
+    <path
+        id="driehoek"
+        style="fill:#00E0E0;stroke:red;stroke-width:.1;gcode-pathcut:true;"
+        d="M50 0 L25 60 L75 60 Z" />
+</svg>
