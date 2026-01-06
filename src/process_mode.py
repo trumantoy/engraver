@@ -28,7 +28,7 @@ class ProcessModeDialog (Gtk.Window):
 
         # 椴木板
         item = GObject.Object()
-        item.label = '浮雕加工'
+        item.label = '曲面加工'
         item.image = 'res/栅格图.png'
         model.append(item)
 

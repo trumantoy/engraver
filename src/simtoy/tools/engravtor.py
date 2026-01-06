@@ -253,18 +253,18 @@ class Label(Element):
         cr.save()
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
+        cr.scale(self.local.scale_x,self.local.scale_y)
 
         if self.params['light_source'] == 'red': cr.set_source_rgb(1, 0, 0)
         else: cr.set_source_rgb(0, 0, 1)
 
         if self.params['engraving_mode'] == 'fill': 
-            cr.scale(self.local.scale_x,self.local.scale_y)
             surface = self.draw_to_image()
             cr.set_source_surface(surface, -surface.get_width() / 2, -surface.get_height() / 2)
             cr.paint()
         else: 
             cr.select_font_face(self.family, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(self.font_size * 0.1)
+            cr.set_font_size(self.font_size)
             text_extents = cr.text_extents(self.text)
             cr.move_to(-text_extents.x_bearing - text_extents.width / 2,-text_extents.y_bearing - text_extents.height / 2)
             cr.text_path(self.text)
