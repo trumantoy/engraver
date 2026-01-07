@@ -318,8 +318,8 @@ class Bitmap(Element):
             self.obj = gfx.Mesh(gfx.plane_geometry(im.size[0] / 1000,im.size[1] / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
             self.add(self.obj)
         elif mode == 'threed':
-            pass
             # self.obj.material = gfx.MeshBasicMaterial(map=tex_map,depth_test=False)
+            pass
 
     def get_image(self):
         return self.im.astype(np.uint8)
@@ -346,10 +346,26 @@ class Bitmap(Element):
         cr.translate(self.local.x * 1000,-self.local.y * 1000)
         cr.rotate(-self.local.euler_z)
         cr.scale(self.local.scale_x,self.local.scale_y)
-        stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
-        surface = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
-        cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
-        cr.paint()
+
+        
+        if self.params['engraving_mode'] == 'fill':
+            stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
+            surface = cairo.ImageSurface.create_for_data(np.asarray(self.im)[...,[2,1,0,3]].copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
+            cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
+            cr.paint()
+        else:
+            gray = np.asarray(self.im.convert('L'))
+            
+            for i in range(255):
+                mask = (gray < i+1)
+                im = np.full_like(gray,0)
+                im[mask] = 255
+                im = Image.fromarray(im,'L').convert('RGBA')
+
+                stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
+                surface = cairo.ImageSurface.create_for_data(np.asanyarray(im).copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
+                cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
+                cr.paint()
         
         cr.restore()
         pass
