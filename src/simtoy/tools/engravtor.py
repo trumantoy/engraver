@@ -293,8 +293,7 @@ class Bitmap(Element):
         self.params['engraving_mode'] = 'fill'
 
         self.filepath = filepath
-        im = Image.open(filepath)
-        im = im.convert('RGBA')
+        im = Image.open(filepath).convert('RGBA')
         self.im = im
         
         tex = gfx.Texture(np.asarray(im),dim=2)
@@ -307,19 +306,15 @@ class Bitmap(Element):
     def set_engraving_mode(self,mode : str):
         self.params['engraving_mode'] = mode
 
-        if mode == 'fill':
-            self.remove(self.obj)
-            im = Image.open(self.filepath)
-            im = im.convert('RGBA')
-            self.im = im
-            
-            tex = gfx.Texture(np.asarray(im),dim=2)
-            tex_map = gfx.TextureMap(tex,filter='nearest')
-            self.obj = gfx.Mesh(gfx.plane_geometry(im.size[0] / 1000,im.size[1] / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
-            self.add(self.obj)
-        elif mode == 'threed':
-            # self.obj.material = gfx.MeshBasicMaterial(map=tex_map,depth_test=False)
-            pass
+        self.remove(self.obj)
+        im = Image.open(self.filepath)
+        im = im.convert('RGBA')
+        self.im = im
+        
+        tex = gfx.Texture(np.asarray(im),dim=2)
+        tex_map = gfx.TextureMap(tex,filter='nearest')
+        self.obj = gfx.Mesh(gfx.plane_geometry(im.size[0] / 1000,im.size[1] / 1000),gfx.MeshBasicMaterial(map=tex_map,depth_test=False))
+        self.add(self.obj)
 
     def get_image(self):
         return self.im.astype(np.uint8)
@@ -365,6 +360,7 @@ class Bitmap(Element):
                 stride = cairo.ImageSurface.format_stride_for_width(cairo.FORMAT_ARGB32, pixel_width)
                 surface = cairo.ImageSurface.create_for_data(np.asanyarray(im).copy().data, cairo.FORMAT_ARGB32, pixel_width, pixel_height, stride)
                 cr.set_source_surface(surface, -pixel_width / 2, -pixel_height / 2)
+                cr.get_source().set_filter(cairo.FILTER_NEAREST)  # 强制最近邻
                 cr.paint()
         
         cr.restore()
@@ -672,26 +668,74 @@ class Engravtor(gfx.WorldObject):
 
     def export_svg(self):
         from io import BytesIO
-        import cairo    
-        svgs = []
 
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
         height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
+        
+        import xml.etree.ElementTree as ElementTree
+        import xml.dom.minidom
+        import io 
+        import base64
+        
+        NAMESPACES = {'svg': 'http://www.w3.org/2000/svg',
+                    'xlink':'http://www.w3.org/1999/xlink'}
+        
+        ElementTreeParent = '__parent__'
+        
+        # 将修改后的图片属性 写入一个新的svg文件，image标签外层加入svg标签，画布大小100x100
+        svg = ElementTree.Element('svg',{'width':f'{width}','height':f'{height}'})
+        svg.attrib['xmlns'] = NAMESPACES["svg"]
+
         for obj in self.target_area.children:
             if Element not in obj.__class__.__mro__: continue
             obj : Label | Bitmap | Vectors
             if not obj.params['excutable']: continue
+            obj.params['pixelsize'] = '0.1'
 
-            svg = BytesIO()
-            with cairo.SVGSurface(svg, width, height) as surface:
-                cr = cairo.Context(surface)
-                cr.set_line_width(self.lightspotsize)
-                cr.translate(width / 2,height / 2)
-                obj.draw_to_svg(cr)
-        
-            obj.params['pixelsize'] = 1 / (obj.local.scale_x / self.lightspotsize)
-            svgs.append((svg,width,height,obj.params))
-        return svgs
+            element = None
+
+            print(obj.__class__)
+            if obj.__class__ == Bitmap:
+                fp = io.BytesIO()
+                obj.im.save(fp, format='PNG')         
+
+                x = obj.local.x*1000 + width/2
+                y = obj.local.y*1000 + height/2
+                r = obj.local.euler_z
+                sx = obj.local.scale_x
+                sy = obj.local.scale_y
+                m6 = f'matrix({round(sx * np.cos(r),2)},{round(-sy * np.sin(r),2)},{round(sx * np.sin(r),2)},{round(sy * np.cos(r),2)},{x},{y})'
+
+                element = ElementTree.Element('image',attrib={
+                                                   'type': 'depth' if obj.params['engraving_mode'] == 'threed' else 'gray',
+                                                   'x':f'{-obj.im.size[0] / 2}',
+                                                   'y':f'{-obj.im.size[1] / 2}',
+                                                   'z':f'-0.1',
+                                                   'width':f'{obj.im.size[0]}',
+                                                   'height':f'{obj.im.size[1]}',
+                                                   'depth':f'10',
+                                                   'transform':m6,
+                                                   'speed':f'{obj.params["speed"]}',
+                                                   'noise':f'10',
+                                                   'maxpower':f'{int(obj.params["power"])}',
+                                                   'step': f'10',
+                                                   'pixelsize':f'0.1',
+                                                    'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
+            else:
+                continue
+
+            element.attrib.pop(ElementTreeParent,None)
+            svg.append(element)
+
+        #如何把svg转换为字符串
+        svg_str = ElementTree.tostring(svg, encoding='utf-8')
+         # 解析为DOM对象
+        dom_obj = xml.dom.minidom.parseString(svg_str)
+        # 美化输出（带缩进、换行）
+        formatted_string = dom_obj.toprettyxml(indent='\t')
+        # 清理多余的空行（toprettyxml会生成额外空行，可选步骤）
+        formatted_string = "\n".join([line for line in formatted_string.split("\n") if line.strip()])
+        return formatted_string
     
     def excute(self,gcode : str):
         def excute_next(lines : list[str]):

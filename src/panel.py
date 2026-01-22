@@ -85,6 +85,18 @@ class Panel (Gtk.Box):
             self.img_status.add_css_class('red-dot')
             self.lbl_status.set_label('未连接')
         return True
+    
+    @Gtk.Template.Callback()
+    def focus_clicked(self, btn):
+        from focus import FocusDialog
+        dlg = FocusDialog()
+
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected:
+            dlg.set_controller(item.controller)
+        else:
+            dlg.set_controller(self.owner)
+        dlg.present()
 
     @Gtk.Template.Callback()
     def device_manager_clicked(self, btn):
@@ -325,56 +337,48 @@ class Panel (Gtk.Box):
         self.box_start.set_visible(True)
         self.box_present.set_visible(False)
         self.box_process.set_visible(False)
-        
-        def f():            
-            gcode = ''
-            for svg,width,height,params in self.owner.export_svg():
-                import tempfile
-                temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
-                svg_filepath = temp_file.name + '.svg'
-                gc_filepath = temp_file.name + '.gc'
-                print(svg_filepath)
-
-                with open(svg_filepath,'w') as f:
-                    f.write(self.parse_svg(svg.getvalue().decode()))
-                
-                print(params)
-                if self.export_gcode_from_svg(svg_filepath,gc_filepath,width,height,params['power'],params['speed'],params['pixelsize']):
-                    continue
-                
-                with open(gc_filepath,'r') as f:
-                    gcode += f.read()
-
-            def f2():
-                self.gcode = gcode
-                self.btn_present.set_active(False)
-
-                buffer = self.textview_gcode.get_buffer()
-                mark = buffer.create_mark("end", buffer.get_end_iter(), False)
-
-                def f3():
-                    self.textview_gcode.scroll_mark_onscreen(mark)
-                    visible_rect = self.textview_gcode.get_visible_rect()
-                    iter,i = self.textview_gcode.get_line_at_y(visible_rect.y + visible_rect.height)
-
-                    if iter.get_line() + 1 == buffer.get_line_count():
-                        self.btn_start.set_sensitive(True)
-                        return False
-                    return True
-
-                buffer.set_text(gcode)
-                self.textview_gcode.grab_focus()
-                GLib.timeout_add(500, f3)
-
-            GLib.idle_add(f2)
-
+       
         buffer = self.textview_gcode.get_buffer()
-        buffer.set_text(';正在生成GCode...')
+        mark = buffer.create_mark("end", buffer.get_end_iter(), False)
         self.emit('preview', True)
+        self.gocde = []
+
+        def f(): 
+            svg = self.owner.export_svg()
+            import tempfile
+            temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
+            svg_filepath = temp_file.name + '.svg'
+            gc_filepath = temp_file.name + '.gc'
+
+            with open(svg_filepath,'w') as f:
+                f.write(svg)
+            
+            import subprocess as sp
+            cmd = ['python','tests/gcoder.py',svg_filepath,gc_filepath]
+            p = sp.Popen(cmd,stdout=sp.PIPE,text=True,encoding='utf-8')
+            print(' '.join(cmd))
+            
+            while True:
+                line = p.stdout.readline().strip()
+                if line: 
+                    self.gocde.append(line)
+                    GLib.idle_add(lambda line: buffer.insert(buffer.get_end_iter(), line + '\n'),line)
+                    continue
+
+                # GLib.idle_add(lambda: self.textview_gcode.scroll_mark_onscreen(mark))
+                if p.poll() is not None: break
+
+            # def end():
+                # self.textview_gcode.scroll_mark_onscreen(mark)
+                # visible_rect = self.textview_gcode.get_visible_rect()
+                # iter,i = self.textview_gcode.get_line_at_y(visible_rect.y + visible_rect.height)
+                # if iter.get_line() + 1 != buffer.get_line_count(): return True
+                # self.btn_start.set_sensitive(True)
+            # GLib.idle_add(end)
 
         self.gcoding = threading.Thread(target=f,daemon=True)
         self.gcoding.start()
-        self.btn_start.set_sensitive(False)
+        # self.btn_start.set_sensitive(False)
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
@@ -398,164 +402,41 @@ class Panel (Gtk.Box):
     def btn_start_toggled(self,sender):
         if self.gcoding.is_alive():
             self.gcoding.join()
+    
+        controller = None
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected:
+            controller = item.controller
+        else:
+            controller = self.owner
 
         if sender.get_active():
-            buffer = self.textview_gcode.get_buffer()
-            start_iter = buffer.get_start_iter()
-            end_iter = buffer.get_end_iter()
-            gcode = buffer.get_text(start_iter, end_iter, True)
-            
-            self.owner.excute(gcode)
-            
-            item = self.device_selection.get_selected_item()
-            if item and item.controller.connected: 
-                item.controller.excute(gcode)
+            line_count = 0
+            def work():
+                nonlocal line_count
+                if not self.get_mapped() or not (line_count < len(self.gocde)):
+                    return False
+                
+                if len(controller.steps) > 100:
+                    return True
 
+                lines = '\n'.join(self.gocde[line_count:line_count+100])                
+                print(lines)  
+                controller.excute(lines)
+                line_count +=100
+
+                buffer = self.textview_gcode.get_buffer()
+                iter = buffer.get_start_iter()
+                iter.forward_lines(line_count+1)
+                mark = buffer.create_mark("offset", iter, False)
+                self.textview_gcode.grab_focus()
+                self.textview_gcode.scroll_mark_onscreen(mark)
+                buffer.place_cursor(iter)
+                buffer.delete_mark(mark)
+                return True
+            GLib.idle_add(work)
             sender.set_label('停止')
-        else:        
-            self.owner.steps.clear()
-            self.owner.excute('M5\nG0\n')
-            item = self.device_selection.get_selected_item()
-            if item and item.controller.connected:             
-                item.controller.steps.clear()
-                item.controller.excute('M5\nG0\n')
-
+        else:
+            controller.steps.clear()
+            controller.excute('M5\nG0\n')
             sender.set_label('开始')
-        
-    def parse_svg(self,svg_content):
-        from lxml import etree
-        import re
-
-        # 2. 解析SVG（保留XML声明和格式）
-        parser = etree.XMLParser(remove_blank_text=True)
-        root = etree.fromstring(svg_content.encode("utf-8"), parser=parser)
-        ns = {"svg": "http://www.w3.org/2000/svg", "xlink": "http://www.w3.org/1999/xlink"}
-
-        # 需求1：移除defs标签，保留内部image标签
-        if (defs := root.find("svg:defs", ns)) is not None:
-            for img in defs.findall("svg:image", ns):
-                root.append(img)  # 将image移到svg根节点
-            root.remove(defs)
-
-        # 需求2：移除image标签href属性的xlink前缀
-        for img in root.findall("svg:image", ns):
-            xlink_href = img.get(f'{{{ns["xlink"]}}}href')
-            if xlink_href:
-                img.set("href", xlink_href)  # 新增普通href属性
-                del img.attrib[f'{{{ns["xlink"]}}}href']  # 删除xlink:href
-
-        # 需求3：移除use标签，将transform转移到对应id的元素
-        for use in root.findall("svg:use", ns):
-            target_id = use.get(f'{{{ns["xlink"]}}}href').lstrip("#")  # 提取目标id
-            if (target := root.xpath(f'//svg:*[@id="{target_id}"]', namespaces=ns)):
-                target[0].set("transform", use.get("transform"))  # 转移transform
-            root.remove(use)
-
-        # 需求4：替换所有rgb颜色为red/blue（红色分量最高则为red，否则blue）
-        rgb_pattern = re.compile(r"rgb\([^)]+\)", re.I)
-        for elem in root.iter():
-            for attr, val in list(elem.attrib.items()):
-                if rgb_pattern.match(val):
-                    # 解析RGB分量（支持百分比/数值格式）
-                    r, g, b = [float(v.strip("%")) * (2.55 if "%" in v else 1) 
-                            for v in re.findall(r"\d+%?", val)]
-                    elem.set(attr, "red" if r > g and r > b else "blue")
-
-        # 3. 输出处理后的SVG
-        result = etree.tostring(
-            root, encoding="utf-8", xml_declaration=True, pretty_print=True
-        ).decode("utf-8")
-        return result
-
-    def export_gcode_from_svg(self,svg_filepath,gc_filepath,width,height,power,speed,pixelsize):
-        from svg2gcode.__main__ import svg2gcode
-        from svg2gcode.svg_to_gcode import css_color
-        import argparse
-        import re
-
-        # defaults
-        cfg = {
-            "lightspotsize_default": 0.1,
-            "pixelsize_default": 0.1,
-            "imagespeed_default": 100,
-            "cuttingspeed_default": 100,
-            "imagepower_default": 100,
-            "poweroffset_default": 0,
-            "cuttingpower_default": 100,
-            "xmaxtravel_default": 100, 
-            "ymaxtravel_default": 100,
-            "rapidmove_default": 10,
-            "noise_default": 0,
-            "overscan_default": 0,
-            "pass_depth_default": 0,
-            "passes_default": 1,
-            "rotate_default": 0,
-            "colorcoded_default": "",
-            "constantburn_default": True,
-        }
-
-        # Define command line argument interface
-        parser = argparse.ArgumentParser(description='Convert svg to gcode for GRBL v1.1 compatible diode laser engravers.')
-        parser.add_argument('svg', type=str, help='svg file to be converted to gcode')
-        parser.add_argument('gcode', type=str, help='gcode output file')
-        parser.add_argument('--showimage', action='store_true', default=False, help='show b&w converted image' )
-        parser.add_argument('--selfcenter', action='store_true', default=False, help='self center the gcode (--origin cannot be used at the same time)' )
-        parser.add_argument('--lightspotsize', default=cfg["lightspotsize_default"], metavar="<default:" + str(cfg["lightspotsize_default"])+">",type=float, help="")
-        parser.add_argument('--pixelsize', default=cfg["pixelsize_default"], metavar="<default:" + str(cfg["pixelsize_default"])+">",type=float, help="pixel size in mm (XY-axis): each image pixel is drawn this size")
-        parser.add_argument('--imagespeed', default=cfg["imagespeed_default"], metavar="<default:" + str(cfg["imagespeed_default"])+">",type=int, help='image draw speed in mm/min')
-        parser.add_argument('--cuttingspeed', default=cfg["cuttingspeed_default"], metavar="<default:" + str(cfg["cuttingspeed_default"])+">",type=int, help='cutting speed in mm/min')
-        parser.add_argument('--imagepower', default=cfg["imagepower_default"], metavar="<default:" +str(cfg["imagepower_default"])+ ">",type=int, help="maximum laser power while drawing an image (as a rule of thumb set to 1/3 of the machine maximum for a 5W laser)")
-        parser.add_argument('--poweroffset', default=cfg["poweroffset_default"], metavar="<default:" +str(cfg["poweroffset_default"])+ ">",type=int, help="pixel intensity to laser power: shift power range [0-imagepower]")
-        parser.add_argument('--cuttingpower', default=cfg["cuttingpower_default"], metavar="<default:" +str(cfg["cuttingpower_default"])+ ">",type=int, help="sets laser power of line (path) cutting")
-        parser.add_argument('--passes', default=cfg["passes_default"], metavar="<default:" +str(cfg["passes_default"])+ ">",type=int, help="Number of passes (iterations) for line drawings, only active when pass_depth is set")
-        parser.add_argument('--pass_depth', default=cfg["pass_depth_default"], metavar="<default:" + str(cfg["pass_depth_default"])+">",type=float, help="cutting depth in mm for one pass, only active for passes > 1")
-        parser.add_argument('--rapidmove', default=cfg["rapidmove_default"], metavar="<default:" + str(cfg["rapidmove_default"])+ ">",type=int, help='generate G0 moves between shapes, for images: G0 moves when skipping more than 10mm (default), 0 is no G0 moves' )
-        parser.add_argument('--noise', default=cfg["noise_default"], metavar="<default:" +str(cfg["noise_default"])+ ">",type=int, help='reduces image noise by not emitting pixels with power lower or equal than this setting')
-        parser.add_argument('--overscan', default=cfg["overscan_default"], metavar="<default:" +str(cfg["overscan_default"])+ ">",type=int, help="overscan image lines to avoid incorrect power levels for pixels at left and right borders, number in pixels, default off")
-        parser.add_argument('--showoverscan', action='store_true', default=False, help='show overscan pixels (note that this is visible and part of the gcode emitted!)' )
-        parser.add_argument('--constantburn', action=argparse.BooleanOptionalAction, default=cfg["constantburn_default"], help='default constant burn mode (M3)')
-        parser.add_argument('--origin', default=None, nargs=2, metavar=('delta-x', 'delta-y'),type=float, help="translate origin by vector (delta-x,delta-y) in mm (default not set, option --selfcenter cannot be used at the same time)")
-        parser.add_argument('--scale', default=None, nargs=2, metavar=('factor-x', 'factor-y'),type=float, help="scale svg with (factor-x,factor-y) (default not set)")
-        parser.add_argument('--rotate', default=cfg["rotate_default"], metavar="<default:" +str(cfg["rotate_default"])+ ">",type=int, help="number of degrees to rotate")
-        parser.add_argument('--splitfile', action='store_true', default=False, help='split gcode output of SVG path and image objects' )
-        parser.add_argument('--pathcut', action='store_true', default=False, help='alway cut SVG path objects! (use laser power set with option --cuttingpower)' )
-        parser.add_argument('--nofill', action='store_true', default=False, help='ignore SVG fill attribute' )
-        parser.add_argument('--xmaxtravel', default=cfg["xmaxtravel_default"], metavar="<default:" +str(cfg["xmaxtravel_default"])+ ">",type=int, help="machine x-axis lengh in mm")
-        parser.add_argument('--ymaxtravel', default=cfg["ymaxtravel_default"], metavar="<default:" +str(cfg["ymaxtravel_default"])+ ">",type=int, help="machine y-axis lengh in mm")
-        parser.add_argument( '--color_coded', action = 'store', default=cfg["colorcoded_default"], metavar="<default:\"" + str(cfg["colorcoded_default"])+ "\">",type = str, help = 'set action for path with specific stroke color "[color = [cut|engrave|ignore] *]*"'', example: --color_coded "black = ignore purple = cut blue = engrave"' )
-        parser.add_argument('--fan', action='store_true', default=False, help='set machine fan on' )
-        parser.add_argument('-V', '--version', action='version', version='%(prog)s ' + '3.3.6', help="show version number and exit")
-
-        # 使用临时文件作为输出路径
-        args = parser.parse_args([svg_filepath, gc_filepath,'--origin',str(-width / 2),str(-height / 2),'--cuttingpower',str(round(power)),'--imagepower',str(round(power)),'--cuttingspeed',str(round(speed)), '--imagespeed',str(round(speed)), '--pixelsize',str(round(pixelsize,2))])
-        
-        if args.color_coded != "":
-            if args.pathcut:
-                print("options --color_coded and --pathcut cannot be used at the same time, program abort")
-                return 1
-            # check argument validity (1)
-
-            # category names
-            category = ["cut", "engrave", "ignore"]
-            # get css color names
-            colors = str([*css_color.css_color_keywords])
-            colors = re.sub(r"(,|\[|\]|\'| )", '', colors.replace(",", "|"))
-
-            # make a color list
-            colors = colors.split("|")
-
-            # get all names from color_code
-            names_regex = "[a-zA-Z]+"
-            match = re.findall(names_regex, args.color_coded)
-            names = [i for i in match]
-
-            for name in names:
-                if not (name in colors or name in category):
-                    print(f"argument error: '--color_coded {args.color_coded}' has a name '{name}' that does not correspond to a css color or category (cut|engrave|ignore).")
-                    return 1
-
-        if args.origin is not None and args.selfcenter:
-            print("options --selfcenter and --origin cannot be used at the same time, program abort")
-            return 1
-
-        return svg2gcode(args)

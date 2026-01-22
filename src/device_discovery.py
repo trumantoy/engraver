@@ -4,12 +4,7 @@ from gi.repository import GLib, Gtk, Gio, GObject
 
 import subprocess as sp
 import numpy as np
-import os
 import threading
-import shutil
-import zipfile
-import trimesh
-import io
 import serial
 
 from simtoy import *

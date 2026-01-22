@@ -68,6 +68,14 @@
                         <property name="margin-bottom">35</property>
                         <property name="spacing">5</property>
 
+
+                        <child>
+                            <object class="GtkButton" id="focus">
+                                <property name="icon-name">dialog-information</property>
+                                <signal name="clicked" handler="focus_clicked" swapped="no"/>
+                            </object>
+                        </child>
+
                         <child>
                             <object class="GtkButton" id="device_manager">
                                 <property name="icon-name">network-transmit-receive-symbolic</property>

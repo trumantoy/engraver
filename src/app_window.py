@@ -96,6 +96,7 @@ class AppWindow (Gtk.ApplicationWindow):
         
         self.camera_controller = gfx.OrbitController()
         for c in self.tool.get_viewport(): self.camera_controller.add_camera(c)
+        self.camera_controller.add_camera(self.editor.persp_camera)
         self.hotbar.connect('item-added', self.item_added)
         self.hotbar.bind_owner(self.tool)
         self.panel.bind_owner(self.tool)
