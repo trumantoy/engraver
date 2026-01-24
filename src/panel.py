@@ -58,7 +58,7 @@ class Panel (Gtk.Box):
         self.device_selection = Gtk.SingleSelection.new(model)
         self.device_selection.set_autoselect(True)
         self.device_selection.set_can_unselect(True)
-        GLib.timeout_add(1000,self.update_status)
+        GLib.timeout_add(3000,self.update_status)
 
         model = Gio.ListStore(item_type=GObject.Object)
         self.param_selection = Gtk.NoSelection.new(model)
@@ -295,6 +295,12 @@ class Panel (Gtk.Box):
 
     @Gtk.Template.Callback()
     def btn_present_toggled(self,sender):
+        controller = None
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected:
+            controller = item.controller
+        else:
+            controller = self.owner
 
         if sender.get_active():
             sender.set_label('停止')
@@ -303,28 +309,26 @@ class Panel (Gtk.Box):
             else: items = self.items
             for item in items:
                 lb,rb,rt,lt = item.get_oriented_bounding_box()
-                gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f} F100\n'
-                gcode += f'M3\n'
-                gcode += f'G1 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f} S5\n'
-                gcode += f'G1 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
-                gcode += f'G1 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
-                gcode += f'G1 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
-                gcode += f'M5\n'
+                gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+                gcode += f'G0 X{rb[0]*1000:.3f} Y{rb[1]*1000:.3f}\n'
+                gcode += f'G0 X{rt[0]*1000:.3f} Y{rt[1]*1000:.3f}\n'
+                gcode += f'G0 X{lt[0]*1000:.3f} Y{lt[1]*1000:.3f}\n'
+                gcode += f'G0 X{lb[0]*1000:.3f} Y{lb[1]*1000:.3f}\n'
+            
+            controller.excute('M5\nG0 F200\n')
 
             def present():
-                if len(self.owner.steps) == 0: 
-                    self.owner.excute(gcode)
-                
-                item = self.device_selection.get_selected_item()
-                if item and len(item.controller.steps) == 0: 
-                    item.controller.excute(gcode)
+                if len(controller.steps) < 5: 
+                    controller.excute(gcode)
 
-                return self.get_mapped() and sender.get_active()
+                if self.get_mapped() and sender.get_active():
+                    return True
+                return False
             GLib.idle_add(present)
         else:
             sender.set_label('走边框')
-            self.owner.steps.clear()
-            self.owner.excute('G0\n')
+            controller.steps.clear()
+            controller.excute('G0\n')
 
     @GObject.Signal(return_type=bool, arg_types=(object,))
     def preview(self,*args): pass
@@ -338,52 +342,37 @@ class Panel (Gtk.Box):
         self.box_present.set_visible(False)
         self.box_process.set_visible(False)
        
-        buffer = self.textview_gcode.get_buffer()
-        mark = buffer.create_mark("end", buffer.get_end_iter(), False)
         self.emit('preview', True)
-        self.gocde = []
+        self.gcode = []
+        buffer = self.textview_gcode.get_buffer()
+        buffer.set_text('')
 
-        def f(): 
-            svg = self.owner.export_svg()
-            import tempfile
-            temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
-            svg_filepath = temp_file.name + '.svg'
-            gc_filepath = temp_file.name + '.gc'
+        svg = self.owner.export_svg()
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False); temp_file.close()
+        svg_filepath = temp_file.name + '.svg'
+        gc_filepath = temp_file.name + '.gc'
 
-            with open(svg_filepath,'w') as f:
-                f.write(svg)
-            
-            import subprocess as sp
-            cmd = ['python','tests/gcoder.py',svg_filepath,gc_filepath]
-            p = sp.Popen(cmd,stdout=sp.PIPE,text=True,encoding='utf-8')
-            print(' '.join(cmd))
-            
-            while True:
-                line = p.stdout.readline().strip()
-                if line: 
-                    self.gocde.append(line)
-                    GLib.idle_add(lambda line: buffer.insert(buffer.get_end_iter(), line + '\n'),line)
-                    continue
-
-                # GLib.idle_add(lambda: self.textview_gcode.scroll_mark_onscreen(mark))
-                if p.poll() is not None: break
-
-            # def end():
-                # self.textview_gcode.scroll_mark_onscreen(mark)
-                # visible_rect = self.textview_gcode.get_visible_rect()
-                # iter,i = self.textview_gcode.get_line_at_y(visible_rect.y + visible_rect.height)
-                # if iter.get_line() + 1 != buffer.get_line_count(): return True
-                # self.btn_start.set_sensitive(True)
-            # GLib.idle_add(end)
-
-        self.gcoding = threading.Thread(target=f,daemon=True)
-        self.gcoding.start()
-        # self.btn_start.set_sensitive(False)
+        with open(svg_filepath,'w') as f:
+            f.write(svg)
+        
+        import subprocess as sp
+        cmd = ['python','tests/gcoder.py',svg_filepath,gc_filepath]
+        self.p = sp.Popen(cmd,stdout=sp.PIPE,text=True,encoding='utf-8')
+        print(' '.join(cmd))
+        
+        def f():
+            lines = self.p.stdout.readlines(20 * 1000)
+            if lines: 
+                self.gcode.extend(lines)
+                buffer = self.textview_gcode.get_buffer()
+                buffer.insert(buffer.get_end_iter(), ''.join(lines))
+            return self.p.poll() is None
+        
+        GLib.timeout_add(1000,f)
 
     @Gtk.Template.Callback()
     def btn_back_clicked(self,sender):
-        if self.gcoding.is_alive():
-            self.gcoding.join()
         self.stack.set_visible_child_name('overview')
         self.box_start.set_visible(False)
         self.box_present.set_visible(True)
@@ -397,12 +386,10 @@ class Panel (Gtk.Box):
             item.controller.steps.clear()
             item.controller.excute('M5\nG0\n')
         
+        if self.p.poll() is None: self.p.kill()
 
     @Gtk.Template.Callback()
-    def btn_start_toggled(self,sender):
-        if self.gcoding.is_alive():
-            self.gcoding.join()
-    
+    def btn_start_toggled(self,sender):    
         controller = None
         item = self.device_selection.get_selected_item()
         if item and item.controller.connected:
@@ -414,25 +401,28 @@ class Panel (Gtk.Box):
             line_count = 0
             def work():
                 nonlocal line_count
-                if not self.get_mapped() or not (line_count < len(self.gocde)):
+                if not self.get_root().get_mapped() or (line_count == len(self.gcode) and self.p.poll() is not None):
+                    sender.emit('toggled')
                     return False
-                
-                if len(controller.steps) > 100:
+                try:
+                    limit = self.gcode.index('M5\n',line_count) + 1
+                    if self.gcode[limit] == 'M2': limit += 1
+                except:
                     return True
-
-                lines = '\n'.join(self.gocde[line_count:line_count+100])                
-                print(lines)  
+                
+                lines = ''.join(self.gcode[line_count:limit])
                 controller.excute(lines)
-                line_count +=100
 
                 buffer = self.textview_gcode.get_buffer()
                 iter = buffer.get_start_iter()
-                iter.forward_lines(line_count+1)
+                iter.forward_lines(limit + 1)
                 mark = buffer.create_mark("offset", iter, False)
                 self.textview_gcode.grab_focus()
                 self.textview_gcode.scroll_mark_onscreen(mark)
                 buffer.place_cursor(iter)
                 buffer.delete_mark(mark)
+
+                line_count = limit
                 return True
             GLib.idle_add(work)
             sender.set_label('停止')

@@ -667,8 +667,6 @@ class Engravtor(gfx.WorldObject):
             obj.visible = True
 
     def export_svg(self):
-        from io import BytesIO
-
         width = int((self.x_lim[1] - self.x_lim[0]) * 1000)
         height = int((self.y_lim[1] - self.y_lim[0]) * 1000)
         
@@ -694,7 +692,6 @@ class Engravtor(gfx.WorldObject):
 
             element = None
 
-            print(obj.__class__)
             if obj.__class__ == Bitmap:
                 fp = io.BytesIO()
                 obj.im.save(fp, format='PNG')         
@@ -710,17 +707,15 @@ class Engravtor(gfx.WorldObject):
                                                    'type': 'depth' if obj.params['engraving_mode'] == 'threed' else 'gray',
                                                    'x':f'{-obj.im.size[0] / 2}',
                                                    'y':f'{-obj.im.size[1] / 2}',
-                                                   'z':f'-0.1',
+                                                   'pass_depth':f'0.0',
                                                    'width':f'{obj.im.size[0]}',
                                                    'height':f'{obj.im.size[1]}',
-                                                   'depth':f'10',
+                                                   'passes':f'10',
                                                    'transform':m6,
-                                                   'speed':f'{obj.params["speed"]}',
-                                                   'noise':f'10',
-                                                   'maxpower':f'{int(obj.params["power"])}',
-                                                   'step': f'10',
-                                                   'pixelsize':f'0.1',
-                                                    'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
+                                                   'speed':f'800',
+                                                   'maxpower':f'99',
+                                                   'densty':f'0.1,0.03',
+                                                   'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
             else:
                 continue
 

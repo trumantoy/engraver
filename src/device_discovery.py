@@ -32,6 +32,7 @@ class USBController:
         except Exception as e:
             self.serial = None
             return False
+    
         
         self.connected = self.is_connected()
         return self.connected
@@ -56,21 +57,29 @@ class USBController:
                 if model_start > 0 and model_end > model_start:
                     self.name = res[model_start:model_end]
             except:
+                import traceback as tb
+                tb.print_exc()
                 return False
         return True
-    
-    def set_axes_invert(self):
+
+    def set_pulse(self):
         with self.mutex:
-            req = f'$240P2P6P5\n'.encode()
+            req = f'$222P1P400\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
 
-    def set_process_params(self):
+    def set_axes_invert(self):
         with self.mutex:
-            req = f'T0 C22\n'.encode()
+            req = f'$240P3P5P6P1\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
-    
+            
+    def set_process_params(self):
+        with self.mutex:
+            req = f'T0 C25\n'.encode()
+            self.serial.write(req)
+            res = self.serial.readline()
+            
     def excute(self, gcode:str):
         for line in gcode.splitlines(True):
             if not line.strip(): continue
@@ -83,7 +92,7 @@ class USBController:
         while True:
             sent = 0
             received = 0
-            limit = 100
+            limit = 500
             n = 1
             
             with self.mutex:
@@ -104,7 +113,11 @@ class USBController:
                     received += n
 
             self.connected = self.is_connected()
-                    
+            
+            import time
+            time.sleep(0.5)
+
+          
 @Gtk.Template(filename='ui/device_discovery.ui')
 class DeviceDiscoveryDialog (Gtk.Window):
     __gtype_name__ = "DeviceDiscoveryDialog"
@@ -155,6 +168,7 @@ class DeviceDiscoveryDialog (Gtk.Window):
             for port in [port.device for port in ports]:
                 controller = USBController()
                 if not controller.connect(port): continue
+                controller.set_pulse()
                 controller.set_axes_invert()
                 controller.set_process_params()
                 device = GObject.Object()
