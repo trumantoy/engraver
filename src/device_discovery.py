@@ -33,7 +33,6 @@ class USBController:
             self.serial = None
             return False
     
-        
         self.connected = self.is_connected()
         return self.connected
     
@@ -42,11 +41,13 @@ class USBController:
             self.serial.close()
 
     def is_connected(self):
+        import time
         with self.mutex:
             if not self.serial: return False
             
             try:
                 self.serial.write(b'$I\n')
+                time.sleep(0)
                 res = self.serial.readall().decode()
                 
                 if '[MODEL:' not in res:
@@ -70,7 +71,7 @@ class USBController:
 
     def set_axes_invert(self):
         with self.mutex:
-            req = f'$240P3P5P6P1\n'.encode()
+            req = f'$240P3P6P5P1\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
             
@@ -89,34 +90,31 @@ class USBController:
         self.event.set()
 
     def worker(self):
+        import time
+                                                       
         while True:
+            count = len(self.steps)
             sent = 0
             received = 0
             limit = 500
-            n = 1
-            
+
             with self.mutex:
-                while self.steps:
-                    req = self.steps.pop(0)
-                    self.serial.write(req)
-                    sent += 1
-                    if sent >= limit:
-                        res = self.serial.readline()
-                        n = len(res.splitlines(True))
-                        received += n
-                        limit += n
+                while count or received < sent:
+                    req = self.steps[:received + limit - sent]
 
-                for _ in range(sent - received):
-                    self.serial.readline()
-                    n = 1
-                    limit += n
-                    received += n
+                    if req:
+                        s = b''.join(req)
+                        self.serial.write(s)
+                        self.steps = self.steps[len(req):]
+                        sent += len(req)
+                        count -= len(req)
 
-            self.connected = self.is_connected()
-            
-            import time
-            time.sleep(0.5)
+                    res = self.serial.read_all().splitlines(True)
 
+                    if res: 
+                        received += len(res)
+
+            time.sleep(0.1)
           
 @Gtk.Template(filename='ui/device_discovery.ui')
 class DeviceDiscoveryDialog (Gtk.Window):
@@ -162,18 +160,18 @@ class DeviceDiscoveryDialog (Gtk.Window):
 
     @Gtk.Template.Callback()
     def btn_usb_refresh_clicked(self, sender):
-        def f():
-            import serial.tools.list_ports
-            ports = serial.tools.list_ports.comports()
-            for port in [port.device for port in ports]:
-                controller = USBController()
-                if not controller.connect(port): continue
-                controller.set_pulse()
-                controller.set_axes_invert()
-                controller.set_process_params()
-                device = GObject.Object()
-                device.controller = controller
-                GLib.idle_add(lambda: self.selection.get_model().append(device))
+        import serial.tools.list_ports
+        ports = serial.tools.list_ports.comports()
+        model = self.selection.get_model()
+        model.remove_all()
 
-        t = threading.Thread(target=f,daemon=True)
-        t.start()
+        for port in [port.device for port in ports]:
+            print(port,flush=True)
+            controller = USBController()
+            if not controller.connect(port): continue
+            controller.set_pulse()
+            controller.set_axes_invert()
+            controller.set_process_params()
+            device = GObject.Object()
+            device.controller = controller
+            self.selection.get_model().append(device)

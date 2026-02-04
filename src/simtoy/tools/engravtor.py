@@ -154,9 +154,14 @@ class Element(gfx.WorldObject):
         self.params['excutable'] = True
         self.params['engraving_mode'] = 'stroke'
         self.params['light_source'] = 'blue'
-        self.params['power'] = 30
-        self.params['speed'] = 300
+        self.params['power'] = 90
+        self.params['speed'] = 800
+        self.params['density_x'] = 0.1
+        self.params['density_y'] = 0.1
         self.params['pixelsize'] = 1
+        self.params['passes'] = 2
+        self.params['pass_depth'] = 0.0
+        self.params['layers'] = 10
         
         self.obj = None
     def set_excutable(self,state):
@@ -173,6 +178,22 @@ class Element(gfx.WorldObject):
 
     def set_speed(self,speed):
         self.params['speed'] = speed
+
+    def set_density_x(self,density):
+        self.params['density_x'] = density
+
+    def set_density_y(self,density):
+        self.params['density_y'] = density
+    
+    def set_passes(self,passes):
+        print(passes)
+        self.params['passes'] = passes
+
+    def set_pass_depth(self,depth):
+        self.params['pass_depth'] = depth
+
+    def set_layers(self,layers):
+        self.params['layers'] = layers
 
     def get_geometry_bounding_box(self):
         return self.obj.get_geometry_bounding_box()
@@ -701,20 +722,23 @@ class Engravtor(gfx.WorldObject):
                 r = obj.local.euler_z
                 sx = obj.local.scale_x
                 sy = obj.local.scale_y
-                m6 = f'matrix({round(sx * np.cos(r),2)},{round(-sy * np.sin(r),2)},{round(sx * np.sin(r),2)},{round(sy * np.cos(r),2)},{x},{y})'
-
+                m6 = f'matrix({sx * np.cos(r)},{-sy * np.sin(r)},{sx * np.sin(r)},{sy * np.cos(r)},{x},{y})'
+                print(obj.params)
                 element = ElementTree.Element('image',attrib={
                                                    'type': 'depth' if obj.params['engraving_mode'] == 'threed' else 'gray',
+                                                   'precision':f'10', # 1-255
                                                    'x':f'{-obj.im.size[0] / 2}',
                                                    'y':f'{-obj.im.size[1] / 2}',
-                                                   'pass_depth':f'0.0',
+                                                   'pass_depth':f'{-obj.params["pass_depth"]}',
+                                                   'passes':f'{round(obj.params["passes"])}',
                                                    'width':f'{obj.im.size[0]}',
                                                    'height':f'{obj.im.size[1]}',
-                                                   'passes':f'10',
+                                                   'layers':f'{round(obj.params["layers"])}',
                                                    'transform':m6,
-                                                   'speed':f'800',
-                                                   'maxpower':f'99',
-                                                   'densty':f'0.1,0.03',
+                                                   'speed':f'{round(obj.params["speed"])}',
+                                                   'maxpower':f'{round(obj.params["power"])}',
+                                                   'density_x':f'{obj.params["density_x"]}',
+                                                   'density_y':f'{obj.params["density_y"]}',
                                                    'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
             else:
                 continue

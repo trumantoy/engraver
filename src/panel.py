@@ -22,14 +22,19 @@ class Panel (Gtk.Box):
     lsv_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
+    swt_excutable = Gtk.Template.Child('excutable')
     btn_engraving_mode_stroke = Gtk.Template.Child('a')
     btn_engraving_mode_full = Gtk.Template.Child('b')
     btn_engraving_mode_threed = Gtk.Template.Child('c')
     dp_light_source = Gtk.Template.Child('light_source')
     spin_power = Gtk.Template.Child('power')
     spin_speed = Gtk.Template.Child('speed')
-    swt_excutable = Gtk.Template.Child('excutable')
-    
+    layers = Gtk.Template.Child('layers')
+    passes = Gtk.Template.Child('passes')
+    pass_depth = Gtk.Template.Child('pass_depth')
+    density_x = Gtk.Template.Child('density_x')
+    density_y = Gtk.Template.Child('density_y')
+
     box_present = Gtk.Template.Child('box_present')
     btn_present = Gtk.Template.Child('present')
     box_process = Gtk.Template.Child('box_process')
@@ -58,7 +63,7 @@ class Panel (Gtk.Box):
         self.device_selection = Gtk.SingleSelection.new(model)
         self.device_selection.set_autoselect(True)
         self.device_selection.set_can_unselect(True)
-        GLib.timeout_add(3000,self.update_status)
+        GLib.timeout_add(1000,self.update_status)
 
         model = Gio.ListStore(item_type=GObject.Object)
         self.param_selection = Gtk.NoSelection.new(model)
@@ -190,14 +195,6 @@ class Panel (Gtk.Box):
         self.param_selection.set_model(None)
         self.param_selection.set_model(model)
 
-    @Gtk.Template.Callback()
-    def power_value_changed(self,spin):
-        self.obj.set_power(spin.get_value())
-
-    @Gtk.Template.Callback()
-    def speed_value_changed(self,spin):
-        self.obj.set_speed(spin.get_value())
-
     def setup_listitem(self, factory, lsi):
         box = Gtk.Box()
         box.set_size_request(-1,80)
@@ -294,6 +291,36 @@ class Panel (Gtk.Box):
         self.lsv_params.set_model(self.param_selection)
 
     @Gtk.Template.Callback()
+    def layers_value_changed(self,spin):
+        self.obj.set_layers(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def passes_value_changed(self,spin):
+        print(spin.get_value())
+        self.obj.set_passes(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def pass_depth_value_changed(self,spin):
+        self.obj.set_pass_depth(spin.get_value())
+
+
+    @Gtk.Template.Callback()
+    def power_value_changed(self,spin):
+        self.obj.set_power(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def speed_value_changed(self,spin):
+        self.obj.set_speed(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def density_x_value_changed(self,spin):
+        self.obj.set_density_x(spin.get_value())
+
+    @Gtk.Template.Callback()
+    def density_y_value_changed(self,spin):
+        self.obj.set_density_y(spin.get_value())
+
+    @Gtk.Template.Callback()
     def btn_present_toggled(self,sender):
         controller = None
         item = self.device_selection.get_selected_item()
@@ -361,72 +388,82 @@ class Panel (Gtk.Box):
         self.p = sp.Popen(cmd,stdout=sp.PIPE,text=True,encoding='utf-8')
         print(' '.join(cmd))
         
-        def f():
-            lines = self.p.stdout.readlines(20 * 1000)
-            if lines: 
-                self.gcode.extend(lines)
-                buffer = self.textview_gcode.get_buffer()
-                buffer.insert(buffer.get_end_iter(), ''.join(lines))
-            return self.p.poll() is None
-        
-        GLib.timeout_add(1000,f)
-
-    @Gtk.Template.Callback()
-    def btn_back_clicked(self,sender):
-        self.stack.set_visible_child_name('overview')
-        self.box_start.set_visible(False)
-        self.box_present.set_visible(True)
-        self.box_process.set_visible(True)
-        self.emit('preview', None)
-        self.owner.steps.clear()
-        self.owner.excute('G0\n')
-        
-        item = self.device_selection.get_selected_item()
-        if item and item.controller.connected: 
-            item.controller.steps.clear()
-            item.controller.excute('M5\nG0\n')
-        
-        if self.p.poll() is None: self.p.kill()
-
-    @Gtk.Template.Callback()
-    def btn_start_toggled(self,sender):    
         controller = None
         item = self.device_selection.get_selected_item()
         if item and item.controller.connected:
             controller = item.controller
         else:
             controller = self.owner
+        limit = line_count = 0
 
-        if sender.get_active():
-            line_count = 0
-            def work():
-                nonlocal line_count
-                if not self.get_root().get_mapped() or (line_count == len(self.gcode) and self.p.poll() is not None):
-                    sender.emit('toggled')
-                    return False
-                try:
-                    limit = self.gcode.index('M5\n',line_count) + 1
-                    if self.gcode[limit] == 'M2': limit += 1
-                except:
-                    return True
-                
-                lines = ''.join(self.gcode[line_count:limit])
-                controller.excute(lines)
+        def f():
+            def f2(line):
+                buffer = self.textview_gcode.get_buffer()
+                buffer.insert(buffer.get_end_iter(), line)
 
+            def f3(n):
                 buffer = self.textview_gcode.get_buffer()
                 iter = buffer.get_start_iter()
-                iter.forward_lines(limit + 1)
+                iter.forward_lines(n)
                 mark = buffer.create_mark("offset", iter, False)
                 self.textview_gcode.grab_focus()
                 self.textview_gcode.scroll_mark_onscreen(mark)
                 buffer.place_cursor(iter)
                 buffer.delete_mark(mark)
 
-                line_count = limit
-                return True
-            GLib.idle_add(work)
+            nonlocal line_count,limit
+            if not self.get_root().get_mapped() or (line_count == len(self.gcode) and self.p.poll() is not None):
+                return False
+
+            lines = self.p.stdout.readlines(20 * 500)
+
+            if len(lines):                
+                self.gcode.extend(lines)
+                f2(''.join(lines))
+
+            if not self.btn_start.get_active(): return True
+
+            try:
+                limit = self.gcode.index('M5\n',limit) + 1
+                if self.gcode[limit] == 'M2\n': limit += 1
+            except:
+                pass
+
+            if line_count == limit: return True
+            
+            f3(limit)
+
+            lines = ''.join(self.gcode[line_count:limit])
+            controller.excute(lines)
+
+            line_count = limit
+            return True
+        
+        GLib.idle_add(f)
+
+    @Gtk.Template.Callback()
+    def btn_back_clicked(self,sender):
+        self.btn_start.set_active(False)
+        self.stack.set_visible_child_name('overview')
+        self.box_start.set_visible(False)
+        self.box_present.set_visible(True)
+        self.box_process.set_visible(True)
+        self.emit('preview', None)
+        
+        controller = None
+        item = self.device_selection.get_selected_item()
+        if item and item.controller.connected:
+            controller = item.controller
+        else:
+            controller = self.owner
+        
+        controller.steps.clear()
+        controller.excute('M5\nG0\n')
+
+
+    @Gtk.Template.Callback()
+    def btn_start_toggled(self,sender):
+        if sender.get_active():
             sender.set_label('停止')
         else:
-            controller.steps.clear()
-            controller.excute('M5\nG0\n')
             sender.set_label('开始')
