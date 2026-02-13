@@ -40,12 +40,9 @@ class Editor(gfx.Scene):
         self.skybox = SkyBox()
         self.add(self.skybox)
 
-        self.env_map = self.skybox.material.map
-
         self.ground = Ground()
         self.ground.receive_shadow = True
         self.ground.local.z -= 0.001
-        self.ground.material.env_map = self.env_map
 
         self.add(self.ground)
 

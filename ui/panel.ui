@@ -185,7 +185,8 @@
                                                         <child>
                                                             <object class="GtkLabel">
                                                                 <property name="label">执行</property>
-                                                                <property name="use-markup">True</property>                <property name="use-markup">True</property>
+                                                                <property name="use-markup">True</property>                
+                                                                <property name="use-markup">True</property>
                                                             </object>
                                                         </child>
 
@@ -280,7 +281,7 @@
                                                                 <property name="step_increment">1</property>
                                                                 <property name="page_increment">10</property>
                                                                 <property name="page_size">0</property>
-                                                                <property name="value">1</property>
+                                                                <property name="value">90</property>
                                                             </object>
                                                         </property>
                                                         <property name="climb_rate">1</property>
@@ -310,11 +311,11 @@
                                                         <property name="adjustment">
                                                             <object class="GtkAdjustment">
                                                                 <property name="lower">1</property>
-                                                                <property name="upper">1000</property>
+                                                                <property name="upper">2000</property>
                                                                 <property name="step_increment">1</property>
                                                                 <property name="page_increment">10</property>
                                                                 <property name="page_size">0</property>
-                                                                <property name="value">1</property>
+                                                                <property name="value">800</property>
                                                             </object>
                                                         </property>
                                                         <property name="climb_rate">1</property>
@@ -322,16 +323,13 @@
                                                     </object>
                                                 </child>
                                             </object>
-
                                         </child>
 
-                                        
                                         <child>
                                             <object class="GtkBox">
-                                                <property name="visible">False</property>
                                                 <child>
                                                     <object class="GtkLabel">
-                                                        <property name="label">加工次数</property>           
+                                                        <property name="label">层数</property>           
                                                         <property name="use-markup">True</property>
                                                         <property name="xalign">0.0</property>
                                                         <property name="width-request">170</property>
@@ -339,7 +337,40 @@
                                                 </child>
 
                                                 <child>
-                                                    <object class="GtkSpinButton">
+                                                    <object class="GtkSpinButton" id="layers">
+                                                        <property name="digits">0</property>
+                                                        <property name="hexpand">True</property>
+                                                        <property name="adjustment">
+                                                            <object class="GtkAdjustment">
+                                                                <property name="lower">1</property>
+                                                                <property name="upper">1000</property>
+                                                                <property name="step_increment">1</property>
+                                                                <property name="page_increment">10</property>
+                                                                <property name="page_size">0</property>
+                                                                <property name="value">10</property>
+                                                            </object>
+                                                        </property>
+                                                        <property name="climb_rate">10</property>
+                                                        <signal name="value-changed" handler="layers_value_changed"/>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+                                        
+                                        <child>
+                                            <object class="GtkBox">
+                                                <property name="visible">True</property>
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">每次加工层数</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="xalign">0.0</property>
+                                                        <property name="width-request">170</property>
+                                                    </object>
+                                                </child>
+
+                                                <child>
+                                                    <object class="GtkSpinButton" id="passes">
                                                         <property name="digits">0</property>
                                                         <property name="hexpand">True</property>
                                                         <property name="adjustment">
@@ -349,15 +380,111 @@
                                                                 <property name="step_increment">1</property>
                                                                 <property name="page_increment">10</property>
                                                                 <property name="page_size">0</property>
-                                                                <property name="value">1</property>
+                                                                <property name="value">2</property>
                                                             </object>
                                                         </property>
                                                         <property name="climb_rate">1</property>
-                                                        <!-- <signal name="value-changed" handler="point_size_value_changed"/> -->
+                                                        <signal name="value-changed" handler="passes_value_changed"/>
                                                     </object>
                                                 </child>
                                             </object>
+                                        </child>
 
+                                        <child>
+                                            <object class="GtkBox">
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">每次下降深度</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="xalign">0.0</property>
+                                                        <property name="width-request">170</property>
+                                                    </object>
+                                                </child>
+
+                                                <child>
+                                                    <object class="GtkSpinButton" id="pass_depth">
+                                                        <property name="digits">2</property>
+                                                        <property name="hexpand">True</property>
+                                                        <property name="adjustment">
+                                                            <object class="GtkAdjustment">
+                                                                <property name="lower">0.01</property>
+                                                                <property name="upper">10</property>
+                                                                <property name="step_increment">0.01</property>
+                                                                <property name="page_increment">0.1</property>
+                                                                <property name="page_size">0</property>
+                                                                <property name="value">0.1</property>
+                                                            </object>
+                                                        </property>
+                                                        <property name="climb_rate">1</property>
+                                                        <signal name="value-changed" handler="pass_depth_value_changed"/>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        <child>
+                                            <object class="GtkBox">
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">密度X</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="xalign">0.0</property>
+                                                        <property name="width-request">170</property>
+                                                    </object>
+                                                </child>
+
+                                                <child>
+                                                    <object class="GtkSpinButton" id="density_x">
+                                                        <property name="digits">2</property>
+                                                        <property name="hexpand">True</property>
+                                                        <property name="adjustment">
+                                                            <object class="GtkAdjustment">
+                                                                <property name="lower">0.01</property>
+                                                                <property name="upper">1</property>
+                                                                <property name="step_increment">0.01</property>
+                                                                <property name="page_increment">1</property>
+                                                                <property name="page_size">0</property>
+                                                                <property name="value">0.1</property>
+                                                            </object>
+                                                        </property>
+                                                        <property name="climb_rate">1</property>
+                                                        <signal name="value-changed" handler="density_x_value_changed"/>
+                                                    </object>
+                                                </child>
+                                            </object>
+                                        </child>
+
+                                        
+                                        <child>
+                                            <object class="GtkBox">
+                                                <child>
+                                                    <object class="GtkLabel">
+                                                        <property name="label">密度Y</property>           
+                                                        <property name="use-markup">True</property>
+                                                        <property name="xalign">0.0</property>
+                                                        <property name="width-request">170</property>
+                                                    </object>
+                                                </child>
+
+                                                <child>
+                                                    <object class="GtkSpinButton" id="density_y">
+                                                        <property name="digits">2</property>
+                                                        <property name="hexpand">True</property>
+                                                        <property name="adjustment">
+                                                            <object class="GtkAdjustment">
+                                                                <property name="lower">0.01</property>
+                                                                <property name="upper">1</property>
+                                                                <property name="step_increment">0.01</property>
+                                                                <property name="page_increment">1</property>
+                                                                <property name="page_size">0</property>
+                                                                <property name="value">0.1</property>
+                                                            </object>
+                                                        </property>
+                                                        <property name="climb_rate">1</property>
+                                                        <signal name="value-changed" handler="density_y_value_changed"/>
+                                                    </object>
+                                                </child>
+                                            </object>
                                         </child>
 
                                         <child>
@@ -570,7 +697,6 @@
                         <child>
                             <object class="GtkButton">
                                 <property name="label">···</property>
-                                <!-- <signal name="clicked" handler="btn_gcode_clicked" swapped="no"/> -->
                             </object>
                         </child>
 

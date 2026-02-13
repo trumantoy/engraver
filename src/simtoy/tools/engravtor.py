@@ -474,6 +474,19 @@ class Vectors(Element):
 
         self.add(self.obj)
 
+class Model(Element):
+    def __init__(self,filepath,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.filepath = filepath
+        self.obj = gfx.load_mesh(filepath)[0]
+        # 重新设置模型的原点在包围盒中心
+        aabb = self.obj.get_geometry_bounding_box()        
+        # 把模型的所有顶点移动到包围盒中心
+        self.obj.local.position = (aabb[1] + aabb[0]) / 2 * -1 + [0,0,(aabb[1][2] - aabb[0][2]) / 2]
+
+        self.add(self.obj)
+    pass
+
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
@@ -497,6 +510,7 @@ class Engravtor(gfx.WorldObject):
         camera.local.scale = 1
 
         persp_camera : gfx.PerspectiveCamera = next(tool.iter(lambda o: o.name == '观察点'))
+        persp_camera.fov = 50
         persp_camera.show_pos(self.target_area.world.position,up=[0,0,1],depth=1.0)
         self.persp_camera = persp_camera
         
@@ -666,6 +680,24 @@ class Engravtor(gfx.WorldObject):
         element.local.z = target_height
         self.target_area.add(element)
 
+    def add_model(self,filepath):
+        target = self.target
+        aabb = target.get_geometry_bounding_box()
+        target_height = (aabb[1][2] - aabb[0][2])
+        
+        element = Model(filepath,name='模型')        
+        # 缩放模型的大小到 xlim ylim 内， z 在 target_height 之上
+        aabb = element.get_geometry_bounding_box()
+        phy_width = (aabb[1][0] - aabb[0][0])
+        phy_height = (aabb[1][1] - aabb[0][1])
+        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height))
+        element.local.scale = scale
+
+        aabb = element.get_world_bounding_box()
+        element.local.z = target_height
+
+        self.target_area.add(element)
+
     def count_elements(self):
         i = 0
         for obj in self.target_area.children:
@@ -705,6 +737,7 @@ class Engravtor(gfx.WorldObject):
         svg = ElementTree.Element('svg',{'width':f'{width}','height':f'{height}'})
         svg.attrib['xmlns'] = NAMESPACES["svg"]
 
+
         for obj in self.target_area.children:
             if Element not in obj.__class__.__mro__: continue
             obj : Label | Bitmap | Vectors
@@ -740,6 +773,32 @@ class Engravtor(gfx.WorldObject):
                                                    'density_x':f'{obj.params["density_x"]}',
                                                    'density_y':f'{obj.params["density_y"]}',
                                                    'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
+            elif obj.__class__ == Model:
+                x = obj.local.x*1000 + width/2
+                y = obj.local.y*1000 + height/2
+                r = obj.local.euler_z
+                sx = obj.local.scale_x
+                sy = obj.local.scale_y
+                m6 = f'matrix({1},{0},{0},{1},{x},{y})'
+                print(obj.params,obj.filepath)
+                # 得到包围盒大小
+                aabb = obj.get_world_bounding_box()
+                # 计算宽度高度
+                width = aabb[1][0] - aabb[0][0]
+                height = aabb[1][1] - aabb[0][1]
+                depth = aabb[1][2] - aabb[0][2]
+                element = ElementTree.Element('image',attrib={
+                                                   'type': 'internal',
+                                                   'x':f'{0}',
+                                                   'y':f'{0}',
+                                                   'pass_depth':f'{obj.params["pass_depth"]}',
+                                                   'width':f'{width * 1000}',
+                                                   'height':f'{height * 1000}',
+                                                   'depth':f'{depth * 1000}',
+                                                   'transform':m6,
+                                                   'speed':f'{round(obj.params["speed"])}',
+                                                   'power':f'{round(obj.params["power"])}',
+                                                   'href':obj.filepath})
             else:
                 continue
 
@@ -751,9 +810,10 @@ class Engravtor(gfx.WorldObject):
          # 解析为DOM对象
         dom_obj = xml.dom.minidom.parseString(svg_str)
         # 美化输出（带缩进、换行）
-        formatted_string = dom_obj.toprettyxml(indent='\t')
+        formatted_string = dom_obj.toprettyxml(indent='\t',encoding='utf-8').decode()
         # 清理多余的空行（toprettyxml会生成额外空行，可选步骤）
         formatted_string = "\n".join([line for line in formatted_string.split("\n") if line.strip()])
+        print(formatted_string)
         return formatted_string
     
     def excute(self,gcode : str):

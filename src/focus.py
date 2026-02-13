@@ -4,8 +4,6 @@ from gi.repository import GLib, Gtk, Gio, GObject
 
 import subprocess as sp
 import numpy as np
-import threading
-import serial
                     
 @Gtk.Template(filename='ui/focus.ui')
 class FocusDialog (Gtk.Window):
@@ -24,16 +22,21 @@ class FocusDialog (Gtk.Window):
 
     def set_controller(self, controller):
         self.controller = controller
-        self.controller.excute('M3\nG1 S5\n')
+        self.controller.excute('M3\nG1 S0\n')
+
+    @Gtk.Template.Callback()
+    def on_power_value_value_changed(self, widget):
+        n = widget.get_value()
+        self.controller.excute(f'G1 S{n}\n')
 
     @Gtk.Template.Callback()
     def up_clicked(self, widget):
         print("up clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G91\nG1 Z{n} S5\nG90\n')
+        self.controller.excute(f'G91\nG1 Z{n}\nG90\n')
 
     @Gtk.Template.Callback()
     def down_clicked(self, widget):
         print("down clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G91\nG1 Z{-n} S5\nG90\n')
+        self.controller.excute(f'G91\nG1 Z{-n}\nG90\n')

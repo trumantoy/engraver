@@ -41,6 +41,15 @@
                         <signal name="clicked" handler="vector_clicked" swapped="no"/>
                     </object>
                 </child>
+                <child>
+                    <object class="GtkButton" id="model">
+                        <property name="label"></property>
+                        <property name="height-request">50</property>
+                        <property name="width-request">50</property>
+                        <property name="icon-name">media-playback-stop</property>
+                        <signal name="clicked" handler="model_clicked" swapped="no"/>
+                    </object>
+                </child>
             </object>
         </child>
     </template>

@@ -380,8 +380,8 @@ class Panel (Gtk.Box):
         svg_filepath = temp_file.name + '.svg'
         gc_filepath = temp_file.name + '.gc'
 
-        with open(svg_filepath,'w') as f:
-            f.write(svg)
+        with open(svg_filepath,'w',encoding='utf-8') as f2:
+            f2.write(svg)
         
         import subprocess as sp
         cmd = ['python','tests/gcoder.py',svg_filepath,gc_filepath]

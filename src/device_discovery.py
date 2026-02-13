@@ -76,17 +76,18 @@ class USBController:
             res = self.serial.readline()
             
     def set_process_params(self):
-        with self.mutex:
+        with self.mutex:    
             req = f'T0 C25\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
             
     def excute(self, gcode:str):
+        reqs = []
         for line in gcode.splitlines(True):
             if not line.strip(): continue
             if line.strip().startswith(';'): continue
-            req = line.encode()
-            self.steps.append(req)
+            reqs.append(line.encode())
+        self.steps.extend(reqs)
         self.event.set()
 
     def worker(self):
@@ -172,6 +173,7 @@ class DeviceDiscoveryDialog (Gtk.Window):
             controller.set_pulse()
             controller.set_axes_invert()
             controller.set_process_params()
+
             device = GObject.Object()
             device.controller = controller
             self.selection.get_model().append(device)

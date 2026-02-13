@@ -1,6 +1,4 @@
 import wgpu 
-import wgpu.gui
-import wgpu.gui.offscreen
 import pygfx as gfx
 # import pybullet as bullet
 # import pybullet_data as bdata

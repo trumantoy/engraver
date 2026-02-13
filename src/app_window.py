@@ -105,10 +105,7 @@ class AppWindow (Gtk.ApplicationWindow):
         self.tool.transformed_func = self.transformed_func
         self.propbar.connect('item-removed', self.item_removed)
         # self.panel.add_device(self.tool)
-        self.panel.connect('preview', self.preview)
-
-        GLib.timeout_add(1000/180,lambda: self.editor.step(1/60) or True)
-
+        self.panel.connect('preview', self.preview)    
     def do_size_allocate(self, width: int, height: int, baseline: int):
         if hasattr(self,'prev_width'): 
             panel = self.stack.get_visible_child()
@@ -159,6 +156,7 @@ class AppWindow (Gtk.ApplicationWindow):
         camera = self.camera_controller.cameras[0]
         camera.logical_size = (area_w,area_h)
         self.light.local.position = camera.local.position
+        self.editor.step(1/60)
         self.renderer.render(self.editor, camera)
         
         img : np.ndarray = np.asarray(self.canvas.draw())

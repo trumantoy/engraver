@@ -1,4 +1,4 @@
-import svg2gcode
 
-if __name__ == '__main__':
-    print('test')
+steps = [1,2,3,4]
+
+print(steps[4:200])

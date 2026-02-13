@@ -222,6 +222,34 @@ class Hotbar (Gtk.ScrolledWindow):
 
         dialog.open(None, None, open_file)  
 
+    @Gtk.Template.Callback()
+    def model_clicked(self,button):
+        dialog = Gtk.FileDialog()
+        dialog.set_modal(True)
+
+        filter_text = Gtk.FileFilter()
+        filter_text.set_name("模型文件")
+        filter_text.add_pattern("*.stl")
+        filter_text.add_pattern("*.obj")
+        
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(filter_text)
+        dialog.set_filters(filters)
+        dialog.set_default_filter(filter_text)
+
+        def open_file(dialog, result): 
+            file_path = None
+            try:
+                file = dialog.open_finish(result)
+                file_path = file.get_path()
+            except:
+                return
+            else:
+                self.owner.add_model(file_path)
+                self.emit('item-added',None)
+
+        dialog.open(None, None, open_file)  
+
 @Gtk.Template(filename='ui/propbar.ui')
 class Propbar (Gtk.ScrolledWindow):
     __gtype_name__ = "Propbar"
