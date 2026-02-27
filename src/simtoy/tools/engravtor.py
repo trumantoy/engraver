@@ -480,12 +480,15 @@ class Model(Element):
         self.filepath = filepath
         self.obj = gfx.load_mesh(filepath)[0]
         # 重新设置模型的原点在包围盒中心
-        aabb = self.obj.get_geometry_bounding_box()        
+        aabb = self.obj.get_geometry_bounding_box()
         # 把模型的所有顶点移动到包围盒中心
         self.obj.local.position = (aabb[1] + aabb[0]) / 2 * -1 + [0,0,(aabb[1][2] - aabb[0][2]) / 2]
-
         self.add(self.obj)
-    pass
+        
+        self.params['engraving_mode'] = 'external'
+    
+    def set_pass_depth(self,depth : float):
+        self.params['pass_depth'] = depth
 
 class Engravtor(gfx.WorldObject):
     def __init__(self,*args,**kwargs):
@@ -666,7 +669,7 @@ class Engravtor(gfx.WorldObject):
         max_y = points[:,1].max()
         phy_width = (max_x - min_x)
         phy_height = (max_y - min_y)
-        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height))
+        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height)) / 2
 
         vectors = []
         for line in lines:
@@ -690,7 +693,7 @@ class Engravtor(gfx.WorldObject):
         aabb = element.get_geometry_bounding_box()
         phy_width = (aabb[1][0] - aabb[0][0])
         phy_height = (aabb[1][1] - aabb[0][1])
-        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height))
+        scale = min(self.x_lim[1] / (phy_width),self.y_lim[1] / (phy_height)) / 2
         element.local.scale = scale
 
         aabb = element.get_world_bounding_box()
@@ -737,7 +740,6 @@ class Engravtor(gfx.WorldObject):
         svg = ElementTree.Element('svg',{'width':f'{width}','height':f'{height}'})
         svg.attrib['xmlns'] = NAMESPACES["svg"]
 
-
         for obj in self.target_area.children:
             if Element not in obj.__class__.__mro__: continue
             obj : Label | Bitmap | Vectors
@@ -756,13 +758,12 @@ class Engravtor(gfx.WorldObject):
                 sx = obj.local.scale_x
                 sy = obj.local.scale_y
                 m6 = f'matrix({sx * np.cos(r)},{-sy * np.sin(r)},{sx * np.sin(r)},{sy * np.cos(r)},{x},{y})'
-                print(obj.params)
                 element = ElementTree.Element('image',attrib={
-                                                   'type': 'depth' if obj.params['engraving_mode'] == 'threed' else 'gray',
+                                                   'type': 'depth' if obj.params['engraving_mode'] == 'external' else 'gray',
                                                    'precision':f'10', # 1-255
                                                    'x':f'{-obj.im.size[0] / 2}',
                                                    'y':f'{-obj.im.size[1] / 2}',
-                                                   'pass_depth':f'{-obj.params["pass_depth"]}',
+                                                   'pass_depth':f'{-round(obj.params["pass_depth"],2)}',
                                                    'passes':f'{round(obj.params["passes"])}',
                                                    'width':f'{obj.im.size[0]}',
                                                    'height':f'{obj.im.size[1]}',
@@ -780,7 +781,6 @@ class Engravtor(gfx.WorldObject):
                 sx = obj.local.scale_x
                 sy = obj.local.scale_y
                 m6 = f'matrix({1},{0},{0},{1},{x},{y})'
-                print(obj.params,obj.filepath)
                 # 得到包围盒大小
                 aabb = obj.get_world_bounding_box()
                 # 计算宽度高度
@@ -789,9 +789,9 @@ class Engravtor(gfx.WorldObject):
                 depth = aabb[1][2] - aabb[0][2]
                 element = ElementTree.Element('image',attrib={
                                                    'type': 'internal',
-                                                   'x':f'{0}',
-                                                   'y':f'{0}',
-                                                   'pass_depth':f'{obj.params["pass_depth"]}',
+                                                   'x':f'{-width * 1000 / 2}',
+                                                   'y':f'{-height * 1000 / 2}',
+                                                   'pass_depth':f'{round(obj.params["pass_depth"],2)}',
                                                    'width':f'{width * 1000}',
                                                    'height':f'{height * 1000}',
                                                    'depth':f'{depth * 1000}',
@@ -813,7 +813,6 @@ class Engravtor(gfx.WorldObject):
         formatted_string = dom_obj.toprettyxml(indent='\t',encoding='utf-8').decode()
         # 清理多余的空行（toprettyxml会生成额外空行，可选步骤）
         formatted_string = "\n".join([line for line in formatted_string.split("\n") if line.strip()])
-        print(formatted_string)
         return formatted_string
     
     def excute(self,gcode : str):

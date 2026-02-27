@@ -19,13 +19,14 @@ class Panel (Gtk.Box):
     lbl_status = Gtk.Template.Child('lbl_status')
     
     stack = Gtk.Template.Child('stack')
-    lsv_params = Gtk.Template.Child('params')
+    # lsv_params = Gtk.Template.Child('params')
     label_kind = Gtk.Template.Child('kind')
     image_icon = Gtk.Template.Child('icon')
     swt_excutable = Gtk.Template.Child('excutable')
     btn_engraving_mode_stroke = Gtk.Template.Child('a')
     btn_engraving_mode_full = Gtk.Template.Child('b')
-    btn_engraving_mode_threed = Gtk.Template.Child('c')
+    btn_engraving_mode_external = Gtk.Template.Child('c')
+    btn_engraving_mode_internal = Gtk.Template.Child('d')
     dp_light_source = Gtk.Template.Child('light_source')
     spin_power = Gtk.Template.Child('power')
     spin_speed = Gtk.Template.Child('speed')
@@ -34,6 +35,10 @@ class Panel (Gtk.Box):
     pass_depth = Gtk.Template.Child('pass_depth')
     density_x = Gtk.Template.Child('density_x')
     density_y = Gtk.Template.Child('density_y')
+
+    box_density_x = Gtk.Template.Child('box_density_x')
+    box_density_y = Gtk.Template.Child('box_density_y')
+    box_passes = Gtk.Template.Child('box_passes')
 
     box_present = Gtk.Template.Child('box_present')
     btn_present = Gtk.Template.Child('present')
@@ -46,13 +51,12 @@ class Panel (Gtk.Box):
     # expander_device = Gtk.Template.Child('expander_device')
     # expander_gcode = Gtk.Template.Child('expander_gcode')
 
-
     # expander_text = Gtk.Template.Child('expander_text')
     # expander_bitmap = Gtk.Template.Child('expander_bitmap')
     # btn_connect = Gtk.Template.Child('btn_connect')
     # dp_com_port = Gtk.Template.Child('dp_com_port')
 
-    # menu_add = Gtk.Template.Child('popover_menu_add')
+    # menu_add = Gtk.Template.Child('popover_menu_add')self.btn_engraving_mode_threed.set_sensitive
     # menu = Gtk.Template.Child('popover_menu')
 
     def __init__(self):
@@ -71,7 +75,7 @@ class Panel (Gtk.Box):
         factory = Gtk.SignalListItemFactory()
         factory.connect("setup", self.setup_listitem)
         factory.connect("bind", self.bind_listitem)
-        self.lsv_params.set_factory(factory)
+        # self.lsv_params.set_factory(factory)
 
         self.items = None
         self.obj = None
@@ -133,37 +137,39 @@ class Panel (Gtk.Box):
         self.obj = obj
 
         if not obj: return
-        self.btn_engraving_mode_stroke.set_sensitive(True)
+        self.btn_engraving_mode_stroke.set_visible(False)
+        self.btn_engraving_mode_full.set_visible(False)
+        self.btn_engraving_mode_external.set_visible(False)
+        self.btn_engraving_mode_internal.set_visible(False)
 
         if obj.__class__.__name__ == 'Label':
             self.label_kind.set_label('文本')
             self.image_icon.set_from_icon_name('format-text-bold')
-            self.btn_engraving_mode_stroke.set_sensitive(True)
-            self.btn_engraving_mode_threed.set_sensitive(False)            
-            if obj.params['engraving_mode'] == 'stroke':
-                self.btn_engraving_mode_stroke.set_active(True)
-            elif obj.params['engraving_mode'] == 'fill':
-                self.btn_engraving_mode_full.set_active(True)
-
+            self.btn_engraving_mode_stroke.set_visible(True)
+            self.btn_engraving_mode_full.set_visible(True)
+            self.btn_engraving_mode_stroke.set_active(obj.params['engraving_mode'] == 'stroke')
+            self.btn_engraving_mode_full.set_active(obj.params['engraving_mode'] == 'fill')
         elif obj.__class__.__name__ == 'Vectors':
             self.label_kind.set_label('矢量图')
             self.image_icon.set_from_icon_name('folder-publicshare-symbolic')
-            self.btn_engraving_mode_stroke.set_sensitive(True)
-            self.btn_engraving_mode_threed.set_sensitive(False)
-            if obj.params['engraving_mode'] == 'stroke':
-                self.btn_engraving_mode_stroke.set_active(True)
-            elif obj.params['engraving_mode'] == 'fill':
-                self.btn_engraving_mode_full.set_active(True)
-
-        else:
+            self.btn_engraving_mode_stroke.set_visible(True)
+            self.btn_engraving_mode_full.set_visible(True)
+            self.btn_engraving_mode_stroke.set_active(obj.params['engraving_mode'] == 'stroke')
+            self.btn_engraving_mode_full.set_active(obj.params['engraving_mode'] == 'fill')
+        elif obj.__class__.__name__ == 'Bitmap':
             self.label_kind.set_label('图片')
             self.image_icon.set_from_icon_name('image-x-generic-symbolic')
-            self.btn_engraving_mode_stroke.set_sensitive(False)
-            self.btn_engraving_mode_threed.set_sensitive(True)
-            if obj.params['engraving_mode'] == 'fill':
-                self.btn_engraving_mode_full.set_active(True)
-            elif obj.params['engraving_mode'] == 'threed':
-                self.btn_engraving_mode_threed.set_active(True)
+            self.btn_engraving_mode_full.set_visible(True)
+            self.btn_engraving_mode_external.set_visible(True)
+            self.btn_engraving_mode_full.set_active(obj.params['engraving_mode'] == 'full')
+            self.btn_engraving_mode_external.set_active(obj.params['engraving_mode'] == 'external')
+        else:
+            self.label_kind.set_label('模型')
+            self.image_icon.set_from_icon_name('image-x-generic-symbolic')
+            self.btn_engraving_mode_external.set_visible(True)
+            self.btn_engraving_mode_internal.set_visible(True)
+            self.btn_engraving_mode_external.set_active(obj.params['engraving_mode'] == 'external')
+            self.btn_engraving_mode_internal.set_active(obj.params['engraving_mode'] == 'internal')
         
         self.dp_light_source.set_selected(0 if obj.params['light_source'] == 'blue' else 1)
         self.spin_power.set_value(obj.params['power'])
@@ -189,11 +195,27 @@ class Panel (Gtk.Box):
         self.param_selection.set_model(model)
 
     @Gtk.Template.Callback()
-    def btn_engraving_mode_threed_clicked(self,btn):
-        self.obj.set_engraving_mode('threed')
+    def btn_engraving_mode_external_clicked(self,btn):
+        self.obj.set_engraving_mode('external')
         model = self.param_selection.get_model()
         self.param_selection.set_model(None)
         self.param_selection.set_model(model)
+
+        self.box_passes.set_visible(True)
+        self.box_density_x.set_visible(True)
+        self.box_density_y.set_visible(True)
+
+    @Gtk.Template.Callback()
+    def btn_engraving_mode_internal_clicked(self,btn):
+        self.obj.set_engraving_mode('internal')
+        model = self.param_selection.get_model()
+        self.param_selection.set_model(None)
+        self.param_selection.set_model(model)
+        
+        self.box_passes.set_visible(False)
+        self.box_density_x.set_visible(False)
+        self.box_density_y.set_visible(False)
+        
 
     def setup_listitem(self, factory, lsi):
         box = Gtk.Box()
@@ -276,10 +298,6 @@ class Panel (Gtk.Box):
         lbl_power.set_label(f'<span color="lightgray" size="medium">{item.obj.params["power"]}%</span>')
         lbl_speed.set_label(f'<span color="lightgray" size="medium">{item.obj.params["speed"]}mm/s</span>')
 
-    @Gtk.Template.Callback()
-    def on_params_activate(self, sender, idx):
-        print(idx)
-
     def set_params(self,items):
         self.items = items
         model = self.param_selection.get_model()
@@ -288,7 +306,7 @@ class Panel (Gtk.Box):
             param = GObject.Object()
             param.obj = item
             model.append(param)
-        self.lsv_params.set_model(self.param_selection)
+        # self.lsv_params.set_model(self.param_selection)
 
     @Gtk.Template.Callback()
     def layers_value_changed(self,spin):
@@ -302,7 +320,6 @@ class Panel (Gtk.Box):
     @Gtk.Template.Callback()
     def pass_depth_value_changed(self,spin):
         self.obj.set_pass_depth(spin.get_value())
-
 
     @Gtk.Template.Callback()
     def power_value_changed(self,spin):
@@ -384,7 +401,7 @@ class Panel (Gtk.Box):
             f2.write(svg)
         
         import subprocess as sp
-        cmd = ['python','tests/gcoder.py',svg_filepath,gc_filepath]
+        cmd = ['python','src/gcoder.py',svg_filepath,gc_filepath]
         self.p = sp.Popen(cmd,stdout=sp.PIPE,text=True,encoding='utf-8')
         print(' '.join(cmd))
         
