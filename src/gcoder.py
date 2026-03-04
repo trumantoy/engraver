@@ -23,3 +23,39 @@ if __name__ == '__main__':
                 'color_coded': '',})
     
     compiler.compile_to_file(args.output, args.input, parse_file(args.input, delta_origin=(-49.5, -50.5), scale_factor=(1,1), rotate_deg=0), passes=1)
+
+
+    from device_discovery import USBController
+    import time
+    import serial.tools.list_ports
+    ports = serial.tools.list_ports.comports()
+    for port in [port.device for port in ports]:
+        print(port)
+        controller = USBController()
+        controller.connect(port)
+        controller.set_pulse()
+        controller.set_axes_invert()
+        controller.set_process_params()
+
+        gcode = True
+        with open(args.output, 'r') as f:
+            while gcode:
+                gcode = f.readline()
+                print(gcode,end='')
+
+                if 'G1 Z' in gcode or 'M3' in gcode: 
+                    time.sleep(0.5)
+
+                controller.excute(gcode) 
+
+        # c = 100
+        # for i in range(c):
+        #     z = (i+1)*0.05
+        #     print(z)
+        #     controller.excute(f'M5\nG1 Z{-0.05}\nM3\n')
+        #     time.sleep(1)
+
+        # controller.excute(f'M5\nG1 Z{round(c*0.05,2)}\nM3\n')
+
+        input('exit')
+        break
