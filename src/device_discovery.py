@@ -48,8 +48,7 @@ class USBController:
             try:
                 self.serial.write(b'$I\n')
                 time.sleep(0)
-                res = self.serial.readall().decode()
-                
+                res = self.serial.readall().decode()                
                 if '[MODEL:' not in res:
                     return False
 
@@ -77,7 +76,7 @@ class USBController:
             
     def set_process_params(self):
         with self.mutex:    
-            req = f'T0 C25\n'.encode()
+            req = f'T0 C50\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
             
@@ -92,6 +91,7 @@ class USBController:
 
     def worker(self):
         import time
+        self.hh = 0
                                                        
         while True:
             count = len(self.steps)
@@ -114,6 +114,8 @@ class USBController:
 
                     if res: 
                         received += len(res)
+
+                    self.hh = sent - received
 
             time.sleep(0.1)
           

@@ -160,8 +160,10 @@ class Element(gfx.WorldObject):
         self.params['density_y'] = 0.1
         self.params['pixelsize'] = 1
         self.params['passes'] = 2
-        self.params['pass_depth'] = 0.0
+        self.params['pass_depth'] = 0.1
         self.params['layers'] = 10
+        self.params['spacing'] = 0.1
+        self.params['refractive'] = 1.0
         
         self.obj = None
     def set_excutable(self,state):
@@ -761,18 +763,18 @@ class Engravtor(gfx.WorldObject):
                 element = ElementTree.Element('image',attrib={
                                                    'type': 'depth' if obj.params['engraving_mode'] == 'external' else 'gray',
                                                    'precision':f'10', # 1-255
-                                                   'x':f'{-obj.im.size[0] / 2}',
-                                                   'y':f'{-obj.im.size[1] / 2}',
+                                                   'x':f'{round(-obj.im.size[0] / 2,2)}',
+                                                   'y':f'{round(-obj.im.size[1] / 2,2)}',
                                                    'pass_depth':f'{-round(obj.params["pass_depth"],2)}',
                                                    'passes':f'{round(obj.params["passes"])}',
-                                                   'width':f'{obj.im.size[0]}',
-                                                   'height':f'{obj.im.size[1]}',
+                                                   'width':f'{round(obj.im.size[0],2)}',
+                                                   'height':f'{round(obj.im.size[1],2)}',
                                                    'layers':f'{round(obj.params["layers"])}',
                                                    'transform':m6,
                                                    'speed':f'{round(obj.params["speed"])}',
                                                    'maxpower':f'{round(obj.params["power"])}',
-                                                   'density_x':f'{obj.params["density_x"]}',
-                                                   'density_y':f'{obj.params["density_y"]}',
+                                                   'density_x':f'{round(obj.params["density_x"],2)}',
+                                                   'density_y':f'{round(obj.params["density_y"],2)}',
                                                    'href':f'data:image/png;base64,{base64.b64encode(fp.getvalue()).decode("utf-8")}'})
             elif obj.__class__ == Model:
                 x = obj.local.x*1000 + width/2
@@ -789,12 +791,16 @@ class Engravtor(gfx.WorldObject):
                 depth = aabb[1][2] - aabb[0][2]
                 element = ElementTree.Element('image',attrib={
                                                    'type': 'internal',
-                                                   'x':f'{-width * 1000 / 2}',
-                                                   'y':f'{-height * 1000 / 2}',
+                                                   'x':f'{round(-width * 1000 / 2,2)}',
+                                                   'y':f'{round(-height * 1000 / 2,2)}',
                                                    'pass_depth':f'{round(obj.params["pass_depth"],2)}',
-                                                   'width':f'{width * 1000}',
-                                                   'height':f'{height * 1000}',
-                                                   'depth':f'{depth * 1000}',
+                                                   #'refractive':f'{round(obj.params["refractive"],2)}',
+                                                   #'spacing':f'{round(obj.params["spacing"],2)}',
+                                                   'refractive':f'1.5',
+                                                   'spacing':f'0.5',
+                                                   'width':f'{round(width * 1000,2)}',
+                                                   'height':f'{round(height * 1000,2)}',
+                                                   'depth':f'{round(depth * 1000,2)}',
                                                    'transform':m6,
                                                    'speed':f'{round(obj.params["speed"])}',
                                                    'power':f'{round(obj.params["power"])}',
@@ -819,7 +825,7 @@ class Engravtor(gfx.WorldObject):
         def excute_next(lines : list[str]):
             while lines:
                 line = lines.pop(0).strip()
-                if not line or line.startswith(';'): 
+                if not line or line.startswith(';'):
                     continue
 
                 # print(line)

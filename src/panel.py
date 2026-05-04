@@ -36,6 +36,7 @@ class Panel (Gtk.Box):
     density_x = Gtk.Template.Child('density_x')
     density_y = Gtk.Template.Child('density_y')
 
+    box_layers = Gtk.Template.Child('box_layers')
     box_density_x = Gtk.Template.Child('box_density_x')
     box_density_y = Gtk.Template.Child('box_density_y')
     box_passes = Gtk.Template.Child('box_passes')
@@ -204,6 +205,7 @@ class Panel (Gtk.Box):
         self.box_passes.set_visible(True)
         self.box_density_x.set_visible(True)
         self.box_density_y.set_visible(True)
+        self.box_layers.set_visible(True)
 
     @Gtk.Template.Callback()
     def btn_engraving_mode_internal_clicked(self,btn):
@@ -215,6 +217,7 @@ class Panel (Gtk.Box):
         self.box_passes.set_visible(False)
         self.box_density_x.set_visible(False)
         self.box_density_y.set_visible(False)
+        self.box_layers.set_visible(False)
         
 
     def setup_listitem(self, factory, lsi):

@@ -33,10 +33,10 @@ class FocusDialog (Gtk.Window):
     def up_clicked(self, widget):
         print("up clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G91\nG1 Z{n}\nG90\n')
+        self.controller.excute(f'G0 Z{n}\n')
 
     @Gtk.Template.Callback()
     def down_clicked(self, widget):
         print("down clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G91\nG1 Z{-n}\nG90\n')
+        self.controller.excute(f'G0 Z{-n}\n')
