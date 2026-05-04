@@ -129,7 +129,7 @@ def model2path(model_path:str):
     svg_str = """<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="{} {} {} {}">""".format(ortho_left, ortho_bottom, ortho_right-ortho_left, ortho_top-ortho_bottom)
 
     # 从mesh z轴最低向z轴最高的地方，进行z轴方向的切片
-    pass_depth = 0.1
+    pass_depth = 0.5
     for z in np.linspace(ortho_far, ortho_near, int((ortho_near-ortho_far)/pass_depth)):
         plane_origin[2] = z
 
