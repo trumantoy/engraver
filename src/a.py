@@ -17,26 +17,30 @@ if __name__ == '__main__':
         controller.set_process_params()
 
         gcode = ''
-        with open(args.output, 'r') as f:
+        with open('b.gc', 'r') as f:
             i = 0
             while True:
                 s = f.readline()
                 i+=1
                 print(i,s,end='')
+                # input('@')
+                # controller.excute(s)
+                # continue
 
                 if s.startswith('G0 Z'):
                     controller.excute(gcode)
 
                     while controller.steps or controller.hh:
-                        time.sleep(2)
+                        time.sleep(1)
 
-                    # time.sleep(2)
                     controller.excute(s)
-                    # time.sleep(2)
+                    # time.sleep(1)
                     gcode = ''
                 else:
                     gcode += s
-    
-                if s.startswith('M2'): break
+
+                if s.startswith('M2'): 
+                    controller.excute(gcode)
+                    break
         input()
         break

@@ -64,7 +64,13 @@ class USBController:
 
     def set_pulse(self):
         with self.mutex:
-            req = f'$222P1P400\n'.encode()
+            req = f'$222P1P1600\n'.encode()
+            self.serial.write(req)
+            res = self.serial.readline()
+            req = f'$222P5P600\n'.encode()
+            self.serial.write(req)
+            res = self.serial.readline()
+            req = f'$222P6P600\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
 
@@ -76,7 +82,7 @@ class USBController:
             
     def set_process_params(self):
         with self.mutex:    
-            req = f'T0 C50\n'.encode()
+            req = f'T0 C25\n'.encode()
             self.serial.write(req)
             res = self.serial.readline()
             

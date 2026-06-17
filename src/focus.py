@@ -22,21 +22,21 @@ class FocusDialog (Gtk.Window):
 
     def set_controller(self, controller):
         self.controller = controller
-        self.controller.excute('M3\nG1 S0\n')
+        self.controller.excute('G0 X0 Y0\nM3\nG1 S0\n')
 
     @Gtk.Template.Callback()
     def on_power_value_value_changed(self, widget):
         n = widget.get_value()
-        self.controller.excute(f'G1 S{n}\n')
+        self.controller.excute(f'G91\nG1 S{n}\nG90\n')
 
     @Gtk.Template.Callback()
     def up_clicked(self, widget):
         print("up clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G0 Z{n}\n')
+        self.controller.excute(f'G91\nG0 Z{n}\nG90\n')
 
     @Gtk.Template.Callback()
     def down_clicked(self, widget):
         print("down clicked")
         n = self.spin.get_value()
-        self.controller.excute(f'G0 Z{-n}\n')
+        self.controller.excute(f'G91\nG0 Z{-n}\nG90\n')
